@@ -2,6 +2,9 @@
 """
 This is the Adobe Offline Package downloader for Windows.
 
+original file
+https://github.com/Drovosek01/adobe-packager
+
 """
 
 import argparse
