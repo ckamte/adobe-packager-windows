@@ -1,15 +1,15 @@
-#!/usr/bin/env python3
 """
 This is the Adobe Offline Package downloader for Windows.
 
-original file
-https://github.com/Drovosek01/adobe-packager
+Download package only! Installer not included
 
+Based on https://github.com/Drovosek01/adobe-packager
 """
 
 import argparse
 import json
 import locale
+import ctypes
 import os
 import random
 import string
@@ -39,31 +39,6 @@ CODE_QUALITY = 'Mildly_AWFUL'
 
 ADOBE_PRODUCTS_XML_URL = 'https://prod-rel-ffc-ccm.oobesaas.adobe.com/adobe-ffc-external/core/v{urlVersion}/products/all?_type=xml&channel=ccm&channel=sti&platform={installPlatform}&productType=Desktop'
 ADOBE_APPLICATION_JSON_URL = 'https://cdn-ffc.oobesaas.adobe.com/core/v3/applications'
-
-DRIVER_XML = '''<DriverInfo>
-    <ProductInfo>
-        <Name>Adobe {name}</Name>
-        <SAPCode>{sapCode}</SAPCode>
-        <CodexVersion>{version}</CodexVersion>
-		<BaseVersion>{baseVersion}</BaseVersion>
-        <Platform>{installPlatform}</Platform>
-        <EsdDirectory>./{sapCode}</EsdDirectory>
-        <Dependencies>
-{dependencies}
-        </Dependencies>
-    </ProductInfo>
-    <RequestInfo>
-        <InstallDir>{installDir}\Adobe</InstallDir>
-        <InstallLanguage>{language}</InstallLanguage>
-    </RequestInfo>
-</DriverInfo>
-'''
-
-DRIVER_XML_DEPENDENCY = '''         <Dependency>
-                <SAPCode>{sapCode}</SAPCode>
-                <BaseVersion>{version}</BaseVersion>
-                <EsdDirectory>./{sapCode}</EsdDirectory>
-            </Dependency>'''
 
 ADOBE_REQ_HEADERS = {
     'X-Adobe-App-Id': 'accc-apps-panel-desktop',
@@ -116,6 +91,7 @@ def parse_products_xml(products_xml, urlVersion):
                 'versions': OrderedDict()
             }
 
+        #icon for main application
         icons = []
         if p.find('productIcons'):
             for icon in p.findall('productIcons/icon'):
@@ -138,11 +114,17 @@ def parse_products_xml(products_xml, urlVersion):
                             break
                 buildGuid = pf.find('languageSet/urls/manifestURL').text
                 # This is actually manifest URL
+            
+            language_set = pf.findall('languageSet/locales/locale')
+            supported_langs = []
+            for locale in language_set:
+                supported_langs.append(locale.get('name'))
 
             products[sap]['versions'][productVersion] = {
                 'sapCode': sap,
                 'baseVersion': baseVersion,
                 'productVersion': productVersion,
+                'supportedLanguages': supported_langs,
                 'productIcons': icons,
                 'apPlatform': appplatform,
                 'dependencies': [{
@@ -187,10 +169,13 @@ def get_download_path():
     return dest
 
 
-def download_icons(icons, icon_dir):
+def download_icons(product, icon_dir):
     print('Downloading application icons')
     if not os.path.exists(icon_dir):
         os.makedirs(icon_dir)
+
+    icons = product['productIcons']
+    prefix = product['sapCode'].lower()
     for url in icons:
         response = session.get(
             url, stream=True, headers=ADOBE_REQ_HEADERS)
@@ -200,7 +185,7 @@ def download_icons(icons, icon_dir):
             block_size = 1024  # 1 Kibibyte
             progress_bar = tqdm(total=total_size_in_bytes,
                                 unit='iB', unit_scale=True)
-            name = url.split('/')[-1].split('?')[0]
+            name = prefix + url.split('/')[-1].split('?')[0]
             file_path = os.path.join(icon_dir, name)
             with open(file_path, 'wb') as file:
                 for data in response.iter_content(block_size):
@@ -249,7 +234,7 @@ def download_APRO(appInfo, cdn):
     print('')
     print('sapCode: ' + sapCode)
     print('version: ' + version)
-    print('installLanguage: ' + 'ALL')
+    print('installLanguage: ' + 'All')
     print('dest: ' + os.path.join(dest, name))
 
     print('\nDownloading...\n')
@@ -327,10 +312,10 @@ def get_products():
 
     return products, cdn, sapCodes, allowedPlatforms
 
-'''
+
 def condition_check(condition, language):
     if 'installLanguage' in condition:
-        if language == 'ALL':
+        if language == 'All':
             return True
         else:
             if language in condition:
@@ -344,11 +329,14 @@ def condition_check(condition, language):
 
     return False
 
+    
 def language_for_premiere(language):
     if '_' in language:
         main, locale = language.split('_')
         return '-esl_lp_' + main
+    return language
 
+        
 def package_filter(package, language):
 	newPackage = []
 
@@ -375,7 +363,77 @@ def package_filter(package, language):
 				else:
 					newPackage.append(pkg)
 	return newPackage
-'''
+
+def language_clean(dict, language):
+	for item in dict:
+		if item['locale'] == language:
+			return item
+
+def json_filter(jsonData, language):
+    jsonData['Packages']['Package'] = package_filter(jsonData['Packages']['Package'], language)
+
+    jsonData['SupportedLanguages']['Language'] = language_clean(jsonData['SupportedLanguages']['Language'], language)
+
+    jsonData['TutorialUrl']['Stage']['Language'] = language_clean(jsonData['TutorialUrl']['Stage']['Language'], language)
+    jsonData['TutorialUrl']['Prod']['Language'] = language_clean(jsonData['TutorialUrl']['Prod']['Language'], language)
+
+    jsonData['AddRemoveInfo']['DisplayName']['Language'] = language_clean(jsonData['AddRemoveInfo']['DisplayName']['Language'], language)
+    jsonData['AddRemoveInfo']['DisplayVersion']['Language'] = language_clean(jsonData['AddRemoveInfo']['DisplayVersion']['Language'], language)
+
+    if 'URLInfoAbout' in jsonData['AddRemoveInfo']: 
+        jsonData['AddRemoveInfo']['URLInfoAbout']['Language'] = language_clean(jsonData['AddRemoveInfo']['URLInfoAbout']['Language'], language)
+
+    if 'URLUpdateInfo' in jsonData['AddRemoveInfo']: 
+        jsonData['AddRemoveInfo']['URLUpdateInfo']['Language'] = language_clean(jsonData['AddRemoveInfo']['URLUpdateInfo']['Language'], language)
+
+    if 'HelpLink' in jsonData['AddRemoveInfo']:
+        jsonData['AddRemoveInfo']['HelpLink']['Language'] = language_clean(jsonData['AddRemoveInfo']['HelpLink']['Language'], language)
+
+    jsonData['ProductDescription']['Tagline']['Language'] = language_clean(jsonData['ProductDescription']['Tagline']['Language'], language)
+
+    if 'DetailedDescription' in jsonData['ProductDescription']:
+        jsonData['ProductDescription']['DetailedDescription']['Language'] = language_clean(jsonData['ProductDescription']['DetailedDescription']['Language'], language)
+
+    return jsonData
+
+def write_driver(jsonData, directory, prefix=""):
+	driver = ET.Element('DriverInfo')
+	product = ET.SubElement(driver, 'ProductInfo')
+
+	prd_name = ET.SubElement(product, 'Name')
+	prd_name.text = 'Adobe ' + jsonData['Name']
+
+	sap_code = ET.SubElement(product, 'SAPCode')
+	sap_code.text = jsonData['SAPCode']
+
+	cod_ver = ET.SubElement(product, 'CodexVersion')
+	cod_ver.text = jsonData['CodexVersion']
+
+	base_ver = ET.SubElement(product, 'BaseVersion')
+	base_ver.text = jsonData['BaseVersion']
+
+	platform = ET.SubElement(product, 'Platform')
+	platform.text = jsonData['Platform']
+
+	esd_dir = ET.SubElement(product, 'EsdDirectory')
+	esd_dir.text = './' + jsonData['SAPCode']
+
+	if 'Dependencies' in jsonData:
+		dep_top = ET.SubElement(product, 'Dependencies')
+		for dependency in jsonData['Dependencies']['Dependency']:
+			dep_sub = ET.SubElement(dep_top, 'Dependency')
+			dep_code = ET.SubElement(dep_sub, 'SAPCode')
+			dep_code.text = dependency['SAPCode']
+			dep_base = ET.SubElement(dep_sub, 'BaseVersion')
+			dep_base.text = dependency['BaseVersion']
+			dep_dir = ET.SubElement(dep_sub, 'EsdDirectory')
+			dep_dir.text = './' + dependency['SAPCode']
+
+	tree = ET.ElementTree(driver)
+	ET.indent(tree, space="    ", level=0)
+	xml_file = os.path.join(directory, prefix + 'driver.xml')
+	tree.write(xml_file, encoding='utf-8', xml_declaration=True)
+
 
 def run_ccdl(products, cdn, sapCodes, allowedPlatforms):
     """Run Main execution."""
@@ -424,25 +482,26 @@ def run_ccdl(products, cdn, sapCodes, allowedPlatforms):
     if sapCode == 'APRO':
         download_APRO(versions[version], cdn)
         return
-
-    # TODO: Parase languages in the xml
-    langs = ['en_US', 'en_GB', 'en_IL', 'en_AE', 'es_ES', 'es_MX', 'pt_BR', 'fr_FR', 'fr_CA', 'fr_MA', 'it_IT', 'de_DE', 'nl_NL',
-             'ru_RU', 'uk_UA', 'zh_TW', 'zh_CN', 'ja_JP', 'ko_KR', 'pl_PL', 'hu_HU', 'cs_CZ', 'tr_TR', 'sv_SE', 'nb_NO', 'fi_FI', 'da_DK', 'ALL']
-    # Detecting Current set default Os language. Fixed.
-    defLang = locale.getlocale()[0]
-    if not defLang:
-        defLang = 'en_US'
-
-    oslang = None
-    if args.osLanguage:
-        oslang = args.osLanguage
-    elif defLang:
-        oslang = defLang
-
-    if oslang in langs:
-        deflang = oslang
+  
+    langs = versions[version]['supportedLanguages']
+    if 'mul' in langs:
+        langs[langs.index('mul')] = 'All'
     else:
-        deflang = 'en_US'
+        if 'All' not in langs:
+            langs.append('All')
+
+    langs.sort()
+
+    # Detecting Current set default Os language. Fixed.
+    windll = ctypes.windll.kernel32
+    osLang = locale.windows_locale[ windll.GetUserDefaultUILanguage() ]
+
+    if args.osLanguage:
+        osLang = args.osLanguage
+
+    defLang = 'All'
+    if osLang in langs:
+        defLang = osLang
 
     installLanguage = None
     if args.installLanguage:
@@ -456,25 +515,25 @@ def run_ccdl(products, cdn, sapCodes, allowedPlatforms):
         print('Available languages: {}'.format(', '.join(langs)))
         while installLanguage is None:
             val = input(
-                f'\nPlease enter the desired install language, or nothing for [{deflang}]: ') or deflang
+                f'\nPlease enter the desired install language, or nothing for [{defLang}]: ') or defLang
             if len(val) == 5:
                 val = val[0:2].lower() + val[2] + val[3:5].upper()
             elif len(val) == 3:
-                val = val.upper()
+                val = val[0].upper() + val[1:].lower()
             if val in langs:
                 installLanguage = val
             else:
                 print(
                     '{} is not available. Please use a value from the list above.'.format(val))
-    if oslang != installLanguage:
-        if installLanguage != 'ALL':
-            while oslang not in langs:
+    if osLang != installLanguage:
+        if installLanguage != 'All':
+            while osLang not in langs:
                 print('Could not detect your default Language.')
-                oslang = input(
+                osLang = input(
                     f'\nPlease enter the your OS Language, or nothing for [{installLanguage}]: ') or installLanguage
-                if oslang not in langs:
+                if osLang not in langs:
                     print(
-                        '{} is not available. Please use a value from the list above.'.format(oslang))
+                        '{} is not available. Please use a value from the list above.'.format(osLang))
 
     dest = get_download_path()
 
@@ -511,6 +570,8 @@ def run_ccdl(products, cdn, sapCodes, allowedPlatforms):
     print('\nCreating {}'.format(install_app_name))
 
     products_dir = os.path.join(dest, 'products')
+    driver_dir = products_dir
+    icon_dir = os.path.join(dest, 'icons')
 
     print('\nPreparing...\n')
 
@@ -522,11 +583,17 @@ def run_ccdl(products, cdn, sapCodes, allowedPlatforms):
         print('[{}_{}] Downloading application.json'.format(s, v))
         app_json = get_application_json(p['buildGuid'])
 
-        '''
-        #replace filtered result for testing
-        to_filter = app_json['Packages']['Package']
-        app_json['Packages']['Package'] = package_filter(to_filter, installLanguage)
-        '''
+        # for main product
+        if 'productIcons' in p:
+            #for driver xml
+            driver_data = app_json
+            
+            #download program icons
+            download_icons(p, icon_dir)
+            
+            #filter json data by language
+            if (installLanguage != 'All'):
+                app_json = json_filter(app_json, installLanguage)
         
         p['application_json'] = app_json
 
@@ -544,8 +611,6 @@ def run_ccdl(products, cdn, sapCodes, allowedPlatforms):
     for p in prods_to_download:
         s, v = p['sapCode'], p['version']
         app_json = p['application_json']
-        #icons directory
-        icon_dir = os.path.join(products_dir, 'icons')
         product_dir = os.path.join(products_dir, s)
 
         print('[{}_{}] Parsing available packages'.format(s, v))
@@ -559,43 +624,23 @@ def run_ccdl(products, cdn, sapCodes, allowedPlatforms):
                 download_urls.append(cdn + pkg['Path'])
             else:
                 # TODO: actually parse `Condition` and check it properly (and maybe look for & add support for conditions other than installLanguage)
-                if installLanguage == "ALL":
+                if installLanguage == "All":
                     noncore_pkg_count += 1
                     download_urls.append(cdn + pkg['Path'])
                 else:
-                    if (not pkg.get('Condition')) or installLanguage in pkg['Condition'] or oslang in pkg['Condition']:
+                    if (not pkg.get('Condition')) or installLanguage in pkg['Condition'] or osLang in pkg['Condition']:
                         noncore_pkg_count += 1
                         download_urls.append(cdn + pkg['Path'])
         print('[{}_{}] Selected {} core packages and {} non-core packages'.format(s,
               v, core_pkg_count, noncore_pkg_count))
 		
-        # get app icons if exist
-        if 'productIcons' in p:
-            productIcons = p['productIcons']
-            download_icons(productIcons, icon_dir)
-		
         for url in download_urls:
             download_file(url, product_dir, s, v)
 
     print('\nGenerating driver.xml')
-	
-    driver = DRIVER_XML.format(
-        name=product['displayName'],
-        sapCode=prodInfo['sapCode'],
-        version=prodInfo['productVersion'],
-		baseVersion=prodInfo['baseVersion'],
-        installPlatform=apPlatform,
-        dependencies='\n'.join([DRIVER_XML_DEPENDENCY.format(
-            sapCode=d['sapCode'],
-            version=d['version']
-        ) for d in prodInfo['dependencies']]),
-		installDir=get_install_dir(),
-        language=installLanguage
-    )
 
-    with open(os.path.join(products_dir, f'{sapCode}-driver.xml'), 'w') as f:
-        f.write(driver)
-        f.close()
+    prefix = driver_data['SAPCode'] + '-'
+    write_driver(driver_data, driver_dir, prefix)
 
     print('\nPackage successfully downloaded.')
     return
