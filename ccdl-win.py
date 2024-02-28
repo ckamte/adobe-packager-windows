@@ -660,8 +660,6 @@ if __name__ == '__main__':
                         help='Version of desired product (eg. 21.0.3)', action='store')
     parser.add_argument('-d', '--destination',
                         help='Directory to download installation files to', action='store')
-    parser.add_argument('-a', '--arch',
-                        help='Set the architecture to download', action='store')
     parser.add_argument('-u', '--urlVersion',
                         help="Get app info from v4/v5/v6 url (eg. v6)", action='store')
     parser.add_argument('-A', '--Auth',
