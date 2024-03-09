@@ -1,10 +1,7 @@
 """
 This is the Adobe Offline Package downloader for Windows.
 
-Download package only! Installer not included
-
-FYI - If cannot down APRO, please re-run the script :)
-      Check line number 593
+Download package only! (except acrobat pro) Installer not included
 
 Based on https://github.com/Drovosek01/adobe-packager
 """
@@ -123,7 +120,7 @@ def app_platform():
             exit(1)
     
     while not appPlatform:
-        val = input('Please enter application platform (eg win32), or nothing for win64: ') or 'win64'
+        val = input('Please enter application platform (eg win32), or nothing for win64: ') or osArch
         if val == 'win32':
             appPlatform = 'win32'
         elif val == 'win64':
@@ -166,8 +163,8 @@ def product_version(product, versions):
     if not version:
         lastVersion = None
         for v in reversed(versions.values()):
-            if v['buildGuid'] and v['apPlatform'] in allowedPlatforms:
-                print('{} Platform: {} - {}'.format(product['displayName'], v['apPlatform'], v['productVersion']))
+            if v['buildGuid'] or v['manifestURL']:
+                print('{} Platform: {} - {}'.format(product['displayName'], v['appPlatform'], v['productVersion']))
                 lastVersion = v['productVersion']
 
         while version is None:
@@ -237,8 +234,23 @@ def install_language(supportedLangs):
     print('\nDownloading packages with {} language'.format(installLanguage))
     return installLanguage
 
+def product_icons(elem):
+    productIcons = []
+    if len(elem.find('productIcons')):
+        for icon in elem.findall('productIcons/icon'):
+            productIcons.append(icon.text)
+    return productIcons
 
-def parse_products_xml(products_url, url_version, allowed_platform, selected_platform):
+
+def product_languages(elem):
+    supportedLang = []
+    if len(elem.find('locales')):
+        for locale in elem.findall('locales/locale'):
+            supportedLang.append(locale.get('name'))
+    return supportedLang
+
+
+def parse_products_xml(products_url, allowed_platform, selected_platform):
     # get xml data
     #print('Using existing products.xml\n')
     #products_xml = ET.parse('products.xml')
@@ -250,77 +262,92 @@ def parse_products_xml(products_url, url_version, allowed_platform, selected_pla
     #with open('products.xml', 'wb+') as f:
     #    f.write(response.content)
     
-    """2nd stage of parsing the XML."""
-    if url_version == 6:
-        prefix = 'channels/'
-    else:
-        prefix = ''
-    cdn = products_xml.find(prefix + 'channel/cdn/secure').text
-    products = {}
-    parent_map = {c: p for p in products_xml.iter() for c in p}
-    for p in products_xml.findall(prefix + 'channel/products/product'):
-        sap = p.get('id')
-        hidden = parent_map[parent_map[p]].get('name') != 'ccm'
-        displayName = p.find('displayName').text
-        productVersion = p.get('version')
-        
-        if not products.get(sap):
-            products[sap] = {
-                'hidden': hidden,
+    """Parsing the XML data."""
+    cdn = products_xml.find('.//*/cdn/secure').text
+    sti_products = products_xml.findall(".//*[@name='sti']/products/product")
+    ccm_products = products_xml.findall(".//*[@name='ccm']/products/product")
+
+    allProducts = {}
+    for product in sti_products:
+        sapCode = product.get('id')
+        displayName = product.find('displayName').text
+        if not allProducts.get(sapCode):
+            allProducts[sapCode] = {
+                'hidden' : True,
                 'displayName': displayName,
-                'sapCode': sap,
+                'sapCode': sapCode,
                 'versions': OrderedDict()
             }
+
+        platforms = product.findall("platforms/platform")
+        if platforms is None:
+            allProducts.pop(sapCode, None)
+            continue
         
-        #icon for main application
-        icons = []
-        if len(p.find('productIcons')):
-            for icon in p.findall('productIcons/icon'):
-                icons.append(icon.text)
-
-        for pf in p.findall('platforms/platform'):
-            baseVersion = pf.find('languageSet').get('baseVersion')
-            buildGuid = pf.find('languageSet').get('buildGuid')
-            appPlatform = pf.get('id')
-            dependencies = list(pf.findall('languageSet/dependencies/dependency'))
-
-            # filter by platform
-            if sap == 'APRO' and appPlatform != selected_platform:
-                break
-            
-            if sap == 'APRO':
-                baseVersion = productVersion
-                if url_version == 4 or url_version == 5:
-                    productVersion = pf.find('languageSet/nglLicensingInfo/appVersion').text
-                if url_version == 6:
-                    for b in products_xml.findall('builds/build'):
-                        if b.get("id") == sap and b.get("version") == baseVersion:
-                            productVersion = b.find('nglLicensingInfo/appVersion').text
-                            break
-                buildGuid = pf.find('languageSet/urls/manifestURL').text
-                # This is actually manifest URL
-                
-            languageSet = pf.findall('languageSet/locales/locale')
-            supportedLang = []
-            for locale in languageSet:
-                supportedLang.append(locale.get('name'))
-
-            # filter products for allowed platform
+        for platform in platforms:
+            appPlatform = platform.attrib['id']
+            # filtered by allowed platform
             if appPlatform in allowed_platform:
-                products[sap]['versions'][productVersion] = {
-                    'sapCode': sap,
-                    'displayName': displayName,
-                    'baseVersion': baseVersion,
-                    'productVersion': productVersion,
-                    'productIcons': icons,
-                    'supportedLanguages': supportedLang,
-                    'apPlatform': appPlatform,
-                    'dependencies': [{
-                        'sapCode': d.find('sapCode').text, 'version': d.find('baseVersion').text
-                    } for d in dependencies],
-                    'buildGuid': buildGuid
-                }
-    return products, cdn
+                languageSet = platform.findall("languageSet")
+                if len(languageSet):
+                    for ls in languageSet:
+                        productInfo = ls.attrib
+                        productVersion = productInfo.get('productVersion')
+                        if productVersion is not None:
+                            allProducts[sapCode]['versions'][productVersion] = {
+                                    'sapCode': sapCode,
+                                    'displayName': displayName,
+                                    'appPlatform' : appPlatform,
+                                    'productVersion' : productInfo.get('productVersion'),
+                                    'baseVersion' : productInfo.get('baseVersion'),
+                                    'supportedLanguages' : product_languages(ls),
+                                    'productIcons' : product_icons(product),
+                                    'buildGuid' : productInfo.get('buildGuid'),
+                                }
+                        else:
+                            allProducts.pop(sapCode, None)
+                else:
+                    allProducts.pop(sapCode, None)
+
+    for product in ccm_products:
+        sapCode = product.get('id')
+        displayName = product.find('displayName').text
+        if not allProducts.get(sapCode):
+            allProducts[sapCode] = {
+                'hidden' : False,
+                'displayName': displayName,
+                'sapCode': sapCode,
+                'versions': OrderedDict()
+            }
+ 
+        # filtered by selected platform
+        languageSet = product.findall("platforms/platform[@id='"  + selected_platform + "']/languageSet")
+        if len(languageSet):
+            for ls in languageSet:
+                manifestURL = ls.find('urls/manifestURL')
+                if manifestURL is not None:
+                    manifestURL = manifestURL.text
+
+                productInfo = ls.attrib
+                productVersion = productInfo.get('productVersion')
+                if productVersion is not None:
+                    allProducts[sapCode]['versions'][productVersion] = {
+                            'sapCode': sapCode,
+                            'displayName': displayName,
+                            'appPlatform' : selected_platform,
+                            'productVersion' : productInfo.get('productVersion'),
+                            'baseVersion' : productInfo.get('baseVersion'),
+                            'supportedLanguages' : product_languages(ls),
+                            'productIcons' : product_icons(product),
+                            'buildGuid' : productInfo.get('buildGuid'),
+                            'manifestURL' : manifestURL
+                        }
+                else:
+                    allProducts.pop(sapCode, None)
+        else:
+            allProducts.pop(sapCode, None)
+
+    return allProducts, cdn
 
 
 def get_products():
@@ -337,16 +364,16 @@ def get_products():
         productsPlatform += ',win32'
     
     products_xml_url = ADOBE_PRODUCTS_XML_URL.format(urlVersion=selectedVersion, installPlatform=productsPlatform)
-    # download and parse product xml
-    products, cdn = parse_products_xml(products_xml_url, selectedVersion, allowedPlatforms, selectedPlatform)
-    
+    # download and parse product xml products, cdn = 
+    products, cdn = parse_products_xml(products_xml_url, allowedPlatforms, selectedPlatform)
+
     sapCodes = {}
     for p in products.values():
         if not p['hidden']:
             versions = p['versions']
             lastVersion = None
             for v in reversed(versions.values()):
-                if v['buildGuid'] and v['apPlatform'] in allowedPlatforms:
+                if v['buildGuid'] or v['manifestURL']:
                     lastVersion = v['productVersion']
             if lastVersion:
                 sapCodes[p['sapCode']] = p['displayName']
@@ -356,7 +383,7 @@ def get_products():
         print('\nProvided SAP Code not found in products: ' + args.sapCode)
         exit(1)
 
-    return products, cdn, sapCodes, allowedPlatforms
+    return products, cdn, sapCodes
 
 
 def get_download_path():
@@ -419,10 +446,10 @@ def file_download(url, dest_dir, s, v, name=None):
         download_progress(url, file_path)
 
 
-def download_APRO(appInfo, cdn):
-    """Download APRO"""
+def download_acrobat(appInfo, cdn):
+    """Download manifest.xml"""
     # download manifest.xml
-    response = session.get(cdn + appInfo['buildGuid'], stream=True, headers=ADOBE_REQ_HEADERS)
+    response = session.get(cdn + appInfo['manifestURL'], stream=True, headers=ADOBE_REQ_HEADERS)
     response.encoding = 'utf-8'
     # to study
     #with open('manifest.xml', 'wb+') as f:
@@ -598,8 +625,7 @@ def package_download(app_json, package_dir, language='All'):
         file_download(cdn + url, package_dir, sapCode, version)
     
 
-
-def run_ccdl(products, cdn, sapCodes, allowedPlatforms):
+def run_ccdl(products, cdn, sapCodes):
     """Run Main execution."""
     # get product list
     sapCode = product_code(sapCodes)
@@ -616,13 +642,13 @@ def run_ccdl(products, cdn, sapCodes, allowedPlatforms):
     supportedLangs = prodInfo['supportedLanguages']
     installLanguage = install_language(supportedLangs)
     
-    # acrobat download
+    # download by manifest url
     if sapCode == 'APRO':
-        download_APRO(prodInfo, cdn)
+        download_acrobat(prodInfo, cdn)
         return
     
     # main product
-    print('\nPrepare to download Adobe {}-{}-{}-{}'.format(prodInfo['displayName'], prodInfo['productVersion'], installLanguage, prodInfo['apPlatform']))
+    print('\nPrepare to download Adobe {}-{}-{}-{}'.format(prodInfo['displayName'], prodInfo['productVersion'], installLanguage, prodInfo['appPlatform']))
     
     dest = get_download_path()
     
@@ -678,9 +704,9 @@ if __name__ == '__main__':
                         help="Skip existing files, e.g. resuming failed downloads", action='store_true')
     args = parser.parse_args()
     
-    products, cdn, sapCodes, allowedPlatforms = get_products()
+    products, cdn, sapCodes = get_products()
     
     while True:
-        run_ccdl(products, cdn, sapCodes, allowedPlatforms)
+        run_ccdl(products, cdn, sapCodes)
         if args.noRepeatPrompt or not questiony('\n\nDo you want to download another package'):
             break
