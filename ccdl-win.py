@@ -256,7 +256,7 @@ def product_languages(elem):
     return supportedLang
 
 
-def parse_products_xml(products_url, allowed_platform, selected_platform):
+def parse_products_xml(products_url, url_version, allowed_platform, selected_platform):
     # get xml data
     #print('Using existing products.xml\n')
     #products_xml = ET.parse('products.xml')
@@ -264,7 +264,7 @@ def parse_products_xml(products_url, allowed_platform, selected_platform):
     response = session.get(products_url, stream=True, headers=ADOBE_REQ_HEADERS)
     response.encoding = 'utf-8'
     products_xml = ET.fromstring(response.content)
-    # to study
+    #to study
     #with open('products.xml', 'wb+') as f:
     #    f.write(response.content)
     
@@ -347,10 +347,12 @@ def parse_products_xml(products_url, allowed_platform, selected_platform):
                             'manifestURL' : manifestURL
                         }
                 else:
-                    allProducts.pop(sapCode, None)
+                    if url_version >= 5:
+                        allProducts.pop(sapCode, None)
         else:
-            allProducts.pop(sapCode, None)
-
+            if url_version >= 5:
+                allProducts.pop(sapCode, None)
+            
     return allProducts, cdn
 
 
@@ -372,7 +374,7 @@ def get_products():
     
     products_xml_url = ADOBE_PRODUCTS_XML_URL.format(urlVersion=selectedVersion, installPlatform=productsPlatform)
     # download and parse product xml
-    products, cdn = parse_products_xml(products_xml_url, allowedPlatforms, selectedPlatform)
+    products, cdn = parse_products_xml(products_xml_url, selectedVersion, allowedPlatforms, selectedPlatform)
 
     sapCodes = {}
     for p in products.values():
