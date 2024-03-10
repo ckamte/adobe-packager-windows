@@ -695,6 +695,22 @@ def package_download(app_json, package_dir, language, selectedPlatform):
     version = app_json['ProductVersion']
     urls, package = package_filter(allPackages, language, selectedPlatform)
 
+    # module filter
+    if 'Modules' in app_json:
+        packageNames = []
+        for names in package:
+            packageNames.append(names['PackageName'])
+
+        allModules = app_json['Modules']['Module']
+        newModules = []
+        for module in allModules:
+            refPackage = module['ReferencePackages']['ReferencePackage']
+            for names in refPackage:
+                if names in packageNames:
+                    newModules.append(module)
+    
+        app_json['Modules']['Module'] = newModules
+    
     # filtered json data
     app_json['Packages']['Package'] = package
     
