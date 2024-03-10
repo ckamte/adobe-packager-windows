@@ -14,6 +14,7 @@ import json
 import locale
 import ctypes
 import sys
+import operator
 from collections import OrderedDict
 from xml.etree import ElementTree as ET
 
@@ -32,7 +33,7 @@ except ImportError:
             or run: pip3 install tqdm.""")
 
 VERSION = 1
-VERSION_STR = '0.0.1'
+VERSION_STR = '0.0.3'
 CODE_QUALITY = 'Really_AWFUL'
 
 ADOBE_PRODUCTS_XML_URL = 'https://prod-rel-ffc-ccm.oobesaas.adobe.com/adobe-ffc-external/core/v{urlVersion}/products/all?_type=xml&channel=ccm&channel=sti&platform={installPlatform}&productType=Desktop'
@@ -50,12 +51,6 @@ ADOBE_DL_HEADERS = {
 }
 
 session = requests.sessions.Session()
-
-try:
-    os.environ["PROGRAMFILES(X86)"]
-    osArch = "win64"
-except:
-    osArch = "win32"
 
 
 def show_version():
@@ -88,10 +83,19 @@ def url_version():
         elif args.urlVersion.lower() == "v6" or args.urlVersion == "6":
             urlVersion = 6
         else:
-            print('Invalid argument "{}" for {}'.format(args.urlVersion, 'URL version'))
-            exit(1)
+            print('Invalid argument "{}" for {}! Please select from version list below\n'.format(args.urlVersion, 'URL version'))
+            urlVersion = None
 
     while not urlVersion:
+        versions = {
+            'v4' : 'URL version 4',
+            'v5' : 'URL version 5',
+            'v6' : 'URL version 6',
+        }
+        print('Available URL versions')
+        for p, v in versions.items():
+            print('[{}]{}{}'.format(p, (12 - len(p)) * ' ', v))
+        
         val = input('\nPlease enter the URL version(v4/v5/v6) for downloading products.xml, or nothing for v6: ') or 'v6'
         if val == 'v4' or val == '4':
             urlVersion = 4
@@ -100,35 +104,37 @@ def url_version():
         elif val == 'v6' or val == '6':
             urlVersion = 6
         else:
-            print('Invalid URL version: {}'.format(val))
+            print('Invalid URL version: {}\n'.format(val))
 
-    print('\nUsing URL version {}\n'.format(urlVersion))
     return urlVersion
 
 
 def app_platform():
+    winPlatforms = {
+            'win32' : '32 Bit Windows',
+            'win64' : '64 Bit Windows',
+            'winarm64' : 'Windows ARM',
+        }
     appPlatform = None
     if args.appPlatform:
-        if "64" in args.appPlatform:
-            appPlatform = "win64"
-            print('\nUsing provided version: ' + appPlatform)
-        elif "32" in args.appPlatform:
-            appPlatform = "win32"
+        if args.appPlatform in winPlatforms:
+            appPlatform = args.appPlatform
             print('\nUsing provided version: ' + appPlatform)
         else:
-            print('Invalid argument "{}" for {}'.format(args.appPlatform, 'application platform'))
-            exit(1)
+            print('Invalid argument "{}" for {}! Please select form list below\n'.format(args.appPlatform, 'application platform'))
+            appPlatform = None
     
     while not appPlatform:
-        val = input('Please enter application platform (eg win32), or nothing for win64: ') or osArch
-        if val == 'win32':
-            appPlatform = 'win32'
-        elif val == 'win64':
-            appPlatform = 'win64'
+        print('Available Platforms')
+        for p, v in winPlatforms.items():
+            print('[{}]{}{}'.format(p, (12 - len(p)) * ' ', v))
+
+        val = input('\nPlease enter application platform (eg win32), or nothing for win64: ') or 'win64'
+        if val in winPlatforms:
+            appPlatform = val
         else:
-            print('Invalid platform: {}'.format(val))
-    
-    print('\nGetting {} products\n'.format(appPlatform))
+            print('Invalid platform: {}\n'.format(val))
+
     return appPlatform
 
 
@@ -184,7 +190,6 @@ def install_language(supportedLangs):
     else:
         if 'All' not in supportedLangs:
             supportedLangs.append('All')
-
     supportedLangs.sort()
 
     # Detecting Current set default Os language. Fixed.
@@ -233,6 +238,7 @@ def install_language(supportedLangs):
 
     print('\nDownloading packages with {} language'.format(installLanguage))
     return installLanguage
+
 
 def product_icons(elem):
     productIcons = []
@@ -286,7 +292,7 @@ def parse_products_xml(products_url, allowed_platform, selected_platform):
         
         for platform in platforms:
             appPlatform = platform.attrib['id']
-            # filtered by allowed platform
+            # filtered by allowed platforms
             if appPlatform in allowed_platform:
                 languageSet = platform.findall("languageSet")
                 if len(languageSet):
@@ -299,7 +305,6 @@ def parse_products_xml(products_url, allowed_platform, selected_platform):
                                     'displayName': displayName,
                                     'appPlatform' : appPlatform,
                                     'productVersion' : productInfo.get('productVersion'),
-                                    'baseVersion' : productInfo.get('baseVersion'),
                                     'supportedLanguages' : product_languages(ls),
                                     'productIcons' : product_icons(product),
                                     'buildGuid' : productInfo.get('buildGuid'),
@@ -336,7 +341,6 @@ def parse_products_xml(products_url, allowed_platform, selected_platform):
                             'displayName': displayName,
                             'appPlatform' : selected_platform,
                             'productVersion' : productInfo.get('productVersion'),
-                            'baseVersion' : productInfo.get('baseVersion'),
                             'supportedLanguages' : product_languages(ls),
                             'productIcons' : product_icons(product),
                             'buildGuid' : productInfo.get('buildGuid'),
@@ -352,7 +356,10 @@ def parse_products_xml(products_url, allowed_platform, selected_platform):
 
 def get_products():
     selectedVersion = url_version()
+    print('\nUsing URL version {}\n'.format(selectedVersion))
+    
     selectedPlatform = app_platform()
+    print('\nGetting {} products\n'.format(selectedPlatform))
     
     if args.Auth:
         ADOBE_REQ_HEADERS['Authorization'] = args.Auth
@@ -364,7 +371,7 @@ def get_products():
         productsPlatform += ',win32'
     
     products_xml_url = ADOBE_PRODUCTS_XML_URL.format(urlVersion=selectedVersion, installPlatform=productsPlatform)
-    # download and parse product xml products, cdn = 
+    # download and parse product xml
     products, cdn = parse_products_xml(products_xml_url, allowedPlatforms, selectedPlatform)
 
     sapCodes = {}
@@ -383,7 +390,7 @@ def get_products():
         print('\nProvided SAP Code not found in products: ' + args.sapCode)
         exit(1)
 
-    return products, cdn, sapCodes
+    return products, cdn, sapCodes, selectedPlatform
 
 
 def get_download_path():
@@ -448,12 +455,11 @@ def file_download(url, dest_dir, s, v, name=None):
 
 def download_acrobat(appInfo, cdn):
     """Download manifest.xml"""
-    # download manifest.xml
     response = session.get(cdn + appInfo['manifestURL'], stream=True, headers=ADOBE_REQ_HEADERS)
     response.encoding = 'utf-8'
     # to study
-    #with open('manifest.xml', 'wb+') as f:
-    #    f.write(response.content)
+    with open('manifest.xml', 'wb+') as f:
+        f.write(response.content)
     manifest = ET.fromstring(response.text)
 
     # for full app
@@ -532,89 +538,162 @@ def write_driver_xml(jsonData, products_dir, prefix=""):
 
 	tree = ET.ElementTree(driver)
 	ET.indent(tree, space="    ", level=0)
-	xml_file = os.path.join(products_dir, prefix + 'driver.xml')
+	xml_file = os.path.join(products_dir, prefix + 'Driver.xml')
 	tree.write(xml_file, encoding='utf-8', xml_declaration=True)
 
 
-def condition_check(condition, language):
-    if 'installLanguage' in condition:
-        if language == 'All':
-            return True
-        else:
-            if language in condition:
-                return True
-	
-    if 'OSProcessorFamily' in condition:
-        # lock on 64 bit os
-        processor = '64-bit'
-        if processor in condition:
-            return True
+def condition_test(package, language, ProcessorFamily, condition):
+	packageType = ProcessorFamily
+	if 'ProcessorFamily' in package:
+		packageType = package['ProcessorFamily']
 
-    return False
+	if '==' in condition:
+		testSubject, testValue = condition.split('==')
+		testOption = operator.eq
+	elif '!=' in condition:
+		testSubject, testValue = condition.split('!=')
+		testOption = operator.ne
+	elif '<=' in condition:
+		testSubject, testValue = condition.split('<=')
+		testOption = operator.le
+	elif '>=' in condition:
+		testSubject, testValue = condition.split('>=')
+		testOption = operator.ge
+	elif '>' in condition:
+		testSubject, testValue = condition.split('>')
+		testOption = operator.gt
+	elif '<' in condition:
+		testSubject, testValue = condition.split('<')
+		testOption = operator.lt
 
-    
+  	# start testing
+	if testSubject.strip() == '[OSProcessorFamily]':
+		return testOption(testValue.strip(), ProcessorFamily)
+	elif testSubject.strip() == '[OSVersion]':
+		getWinVer = sys.getwindowsversion()
+		winVer = '{}.{}'.format(getWinVer.major, getWinVer.minor)
+		return testOption(testValue.strip(), winVer)
+	elif testSubject.strip() == '[installLanguage]' and packageType == ProcessorFamily:
+		if language.lower() == 'all' or language.lower() == 'mul':
+			return True
+		else:
+			return testOption(testValue.strip(), language)
+	else:
+        # alway true on unset
+		return True
+
+
+def condition_filter(package, language, ProcessorFamily):
+	conditions = []
+	conditionString = package['Condition'].strip()
+	result = False
+	if '&&' in conditionString:
+		conditions = conditionString.split('&&')
+		for condition in conditions:
+			result = True
+			if condition_test(package, language, ProcessorFamily, condition) == False:
+				result = False
+				break
+
+	elif '||' in conditionString:
+		conditions = conditionString.split('||')
+		for condition in conditions:
+			result = False
+			if condition_test(package, language, ProcessorFamily, condition) == True:
+				result = True
+				break
+	else:
+		result = condition_test(package, language, ProcessorFamily, conditionString)
+
+	return result
+
+
 def language_for_premiere(language):
     if '_' in language:
         main, locale = language.split('_')
         return '-esl_lp_' + main
     return language
 
-        
-def package_filter(package, language):
-    coreCount = 0
-    noneCoreCount = 0
-    newPackage = []
-    urlPath = []
-    for pkg in package:
-        if pkg.get('Type') and pkg['Type'] == 'core':
-            if 'Condition' in pkg:
-                condition = pkg['Condition']
-                if condition_check(condition, language):
-                    newPackage.append(pkg)
-                    urlPath.append(pkg['Path'])
-                    coreCount += 1
-            else:
-                newPackage.append(pkg)
-                urlPath.append(pkg['Path'])
-                coreCount += 1
 
-        else:
-            if 'Condition' in pkg:
-                condition = pkg['Condition']
-                if condition_check(condition, language):
-                    newPackage.append(pkg)
-                    urlPath.append(pkg['Path'])
-                    noneCoreCount += 1
-            else:
+def package_filter(package, language, platform):
+	coreCount = 0
+	noneCoreCount = 0
+	urlPath = []
+	newPackage = []
+
+	ProcessorFamily = '64-bit'
+	if platform == 'win32':
+		ProcessorFamily = '32-bit'
+
+	for pkg in package:
+		if pkg.get('Type') and pkg['Type'] == 'core':
+			if 'Condition' in pkg:
+				if condition_filter(pkg, language, ProcessorFamily) == True:
+					newPackage.append(pkg)
+					urlPath.append(pkg['Path'])
+					coreCount += 1
+			elif 'ProcessorFamily' in pkg:
+				if platform == 'win32':
+					if pkg['ProcessorFamily'] == ProcessorFamily:
+						newPackage.append(pkg)
+						urlPath.append(pkg['Path'])
+						coreCount += 1
+				else:
+					newPackage.append(pkg)
+					urlPath.append(pkg['Path'])
+					coreCount += 1
+			else:
+				newPackage.append(pkg)
+				urlPath.append(pkg['Path'])
+				coreCount += 1
+		else:
+			if 'Condition' in pkg:
+				if condition_filter(pkg, language, ProcessorFamily) == True:
+					newPackage.append(pkg)
+					urlPath.append(pkg['Path'])
+					noneCoreCount += 1
+			elif 'ProcessorFamily' in pkg:
+				if platform == 'win32':
+					if pkg['ProcessorFamily'] == ProcessorFamily:
+						newPackage.append(pkg)
+						urlPath.append(pkg['Path'])
+						noneCoreCount += 1
+				else:
+					newPackage.append(pkg)
+					urlPath.append(pkg['Path'])
+					noneCoreCount += 1
+			else:
 				# for premiere pro
-                if '-esl_lp_' in pkg['PackageName']:
-                    if language_for_premiere(language) in pkg['PackageName']:
-                        newPackage.append(pkg)
-                        urlPath.append(pkg['Path'])
-                        noneCoreCount += 1
-                else:
-                    newPackage.append(pkg)
-                    urlPath.append(pkg['Path'])
-                    noneCoreCount += 1
-    print('Selected {} core packages and {} non-core packages'.format(coreCount, noneCoreCount))
-    return urlPath, newPackage
+				if '-esl_lp_' in pkg['PackageName']:
+					if language_for_premiere(language) in pkg['PackageName']:
+						newPackage.append(pkg)
+						urlPath.append(pkg['Path'])
+						noneCoreCount += 1
+				else:
+					newPackage.append(pkg)
+					urlPath.append(pkg['Path'])
+					noneCoreCount += 1
+
+	print('Selected {} core packages and {} non-core packages'.format(coreCount, noneCoreCount))
+
+	return urlPath, newPackage
 
 
-def dependencies_download(dep_data, products_dir):
+def dependencies_download(dep_data, products_dir, language, selectedPlatform):
     dep_dir = os.path.join(products_dir, dep_data['sapCode'])
     os.makedirs(dep_dir, exist_ok=True)
     dep_data = list(dep_data['versions'].values())
     firstItem = dep_data[0]    
     dep_json = get_application_json(firstItem['buildGuid'])
-    package_download(dep_json, dep_dir)
+    package_download(dep_json, dep_dir, language, selectedPlatform)
 
 
-def package_download(app_json, package_dir, language='All'):
+def package_download(app_json, package_dir, language, selectedPlatform):
     allPackages = app_json['Packages']['Package']
     cdn = app_json['Cdn']['Secure']
     sapCode = app_json['SAPCode']
     version = app_json['ProductVersion']
-    urls, package = package_filter(allPackages, language)
+    urls, package = package_filter(allPackages, language, selectedPlatform)
 
     # filtered json data
     app_json['Packages']['Package'] = package
@@ -625,7 +704,7 @@ def package_download(app_json, package_dir, language='All'):
         file_download(cdn + url, package_dir, sapCode, version)
     
 
-def run_ccdl(products, cdn, sapCodes):
+def run_ccdl(products, cdn, sapCodes, selectedPlatform):
     """Run Main execution."""
     # get product list
     sapCode = product_code(sapCodes)
@@ -663,13 +742,13 @@ def run_ccdl(products, cdn, sapCodes):
     
     app_json = get_application_json(prodInfo['buildGuid'])
     
-    package_download(app_json, package_dir, installLanguage)
+    package_download(app_json, package_dir, installLanguage, selectedPlatform)
     
     if 'Dependencies' in app_json:
         for dependency in app_json['Dependencies']['Dependency']:
             depSap = dependency['SAPCode']
             depPackage = products.get(depSap)
-            dependencies_download(depPackage, products_dir)
+            dependencies_download(depPackage, products_dir, installLanguage, selectedPlatform)
     
     print('\nGenerating driver.xml')
     prefix = app_json['SAPCode'] + '-'
@@ -704,9 +783,9 @@ if __name__ == '__main__':
                         help="Skip existing files, e.g. resuming failed downloads", action='store_true')
     args = parser.parse_args()
     
-    products, cdn, sapCodes = get_products()
+    products, cdn, sapCodes, selectedPlatform = get_products()
     
     while True:
-        run_ccdl(products, cdn, sapCodes)
+        run_ccdl(products, cdn, sapCodes, selectedPlatform)
         if args.noRepeatPrompt or not questiony('\n\nDo you want to download another package'):
             break
