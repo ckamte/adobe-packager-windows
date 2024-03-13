@@ -198,7 +198,7 @@ def product_version(product, versions):
     if not version:
         lastVersion = None
         for v in reversed(versions.values()):
-            if v["buildGuid"] or v["manifestURL"]:
+            if v["buildGuid"] is not None or v["manifestURL"] is not None:
                 print(
                     "{} Platform: {} - {}".format(
                         product["displayName"], v["appPlatform"], v["productVersion"]
@@ -320,102 +320,66 @@ def product_languages(elem):
 
 def parse_products_xml(products_url, url_version, allowed_platform, selected_platform):
     # get xml data
-    # print('Using existing products.xml\n')
-    # products_xml = ET.parse('products.xml')
     print("Downloading product data\n")
     response = session.get(products_url, stream=True, headers=ADOBE_REQ_HEADERS)
     response.encoding = "utf-8"
     products_xml = ET.fromstring(response.content)
-    # to study
-    # with open('products.xml', 'wb+') as f:
-    #    f.write(response.content)
 
-    """Parsing the XML data."""
     cdn = products_xml.find(".//*/cdn/secure").text
-    sti_products = products_xml.findall(".//*[@name='sti']/products/product")
-    ccm_products = products_xml.findall(".//*[@name='ccm']/products/product")
-
     allProducts = {}
-    for product in sti_products:
-        sapCode = product.get("id")
-        displayName = product.find("displayName").text
-        if not allProducts.get(sapCode):
-            allProducts[sapCode] = {
-                "hidden": True,
-                "displayName": displayName,
-                "sapCode": sapCode,
-                "versions": OrderedDict(),
-            }
+    for channel in products_xml.findall(".//channel"):
+        appType = "dep"
+        if channel.attrib["name"] == "ccm":
+            appType = "app"
 
-        platforms = product.findall("platforms/platform")
-        if platforms is None:
-            allProducts.pop(sapCode, None)
-            continue
+        for product in channel.findall("./products/product"):
+            sapCode = product.get("id")
+            displayName = product.find("displayName").text
+            for plat in [
+                item
+                for item in product.findall("./platforms/platform")
+                if item.attrib["id"] in allowed_platform
+            ]:
+                appPlatform = plat.attrib["id"]
+                # platform filter for main app
+                if appType == "app" and appPlatform != selected_platform:
+                    continue
 
-        for platform in platforms:
-            appPlatform = platform.attrib["id"]
-            # filtered by allowed platforms
-            if appPlatform in allowed_platform:
-                languageSet = platform.findall("languageSet")
-                if len(languageSet):
-                    for ls in languageSet:
-                        productInfo = ls.attrib
-                        productVersion = productInfo.get("productVersion")
+                if plat.findall(
+                    "./languageSet[@packageType='hdPackage']"
+                ) or plat.findall("./languageSet[@packageType='application']"):
+                    if not allProducts.get(sapCode):
+                        allProducts[sapCode] = {
+                            "appType": appType,
+                            "displayName": displayName,
+                            "sapCode": sapCode,
+                            "versions": OrderedDict(),
+                        }
+
+                    for ls in plat.findall("languageSet"):
+                        languageSet = ls.attrib
+                        productVersion = languageSet.get("productVersion")
+
+                        # manifest url for APRO
+                        manifestURL = ls.find("urls/manifestURL")
+                        if manifestURL is not None:
+                            manifestURL = manifestURL.text
+
+                        # get product with version
                         if productVersion is not None:
                             allProducts[sapCode]["versions"][productVersion] = {
                                 "sapCode": sapCode,
                                 "displayName": displayName,
                                 "appPlatform": appPlatform,
-                                "productVersion": productInfo.get("productVersion"),
+                                "productVersion": languageSet.get("productVersion"),
                                 "supportedLanguages": product_languages(ls),
                                 "productIcons": product_icons(product),
-                                "buildGuid": productInfo.get("buildGuid"),
+                                "buildGuid": languageSet.get("buildGuid"),
+                                "manifestURL": manifestURL,
                             }
                         else:
-                            allProducts.pop(sapCode, None)
-                else:
-                    allProducts.pop(sapCode, None)
-
-    for product in ccm_products:
-        sapCode = product.get("id")
-        displayName = product.find("displayName").text
-        if not allProducts.get(sapCode):
-            allProducts[sapCode] = {
-                "hidden": False,
-                "displayName": displayName,
-                "sapCode": sapCode,
-                "versions": OrderedDict(),
-            }
-
-        # filtered by selected platform
-        languageSet = product.findall(
-            "platforms/platform[@id='" + selected_platform + "']/languageSet"
-        )
-        if len(languageSet):
-            for ls in languageSet:
-                manifestURL = ls.find("urls/manifestURL")
-                if manifestURL is not None:
-                    manifestURL = manifestURL.text
-
-                productInfo = ls.attrib
-                productVersion = productInfo.get("productVersion")
-                if productVersion is not None:
-                    allProducts[sapCode]["versions"][productVersion] = {
-                        "sapCode": sapCode,
-                        "displayName": displayName,
-                        "appPlatform": selected_platform,
-                        "productVersion": productInfo.get("productVersion"),
-                        "supportedLanguages": product_languages(ls),
-                        "productIcons": product_icons(product),
-                        "buildGuid": productInfo.get("buildGuid"),
-                        "manifestURL": manifestURL,
-                    }
-                else:
-                    if url_version >= 5:
-                        allProducts.pop(sapCode, None)
-        else:
-            if url_version >= 5:
-                allProducts.pop(sapCode, None)
+                            if url_version >= 5:
+                                allProducts.pop(sapCode, None)
 
     return allProducts, cdn
 
@@ -446,11 +410,11 @@ def get_products():
 
     sapCodes = {}
     for p in products.values():
-        if not p["hidden"]:
+        if p["appType"] == "app":
             versions = p["versions"]
             lastVersion = None
             for v in reversed(versions.values()):
-                if v["buildGuid"] or v["manifestURL"]:
+                if v["buildGuid"] is not None or v["manifestURL"] is not None:
                     lastVersion = v["productVersion"]
             if lastVersion:
                 sapCodes[p["sapCode"]] = p["displayName"]
@@ -477,6 +441,14 @@ def get_download_path():
 def download_progress(url, dest_dir, prefix=""):
     response = session.get(url, stream=True, headers=ADOBE_REQ_HEADERS)
     total_size_in_bytes = int(response.headers.get("content-length", 0))
+    if (
+        args.skipExisting
+        and os.path.isfile(dest_dir)
+        and os.path.getsize(dest_dir) == total_size_in_bytes
+    ):
+        print("Downloaded file is OK, skipping ... \n")
+        return
+
     if total_size_in_bytes > 0:
         block_size = 1024  # 1 Kibibyte
         progress_bar = tqdm(total=total_size_in_bytes, unit="iB", unit_scale=True)
@@ -511,16 +483,7 @@ def file_download(url, dest_dir, s, v, name=None):
         name = os.path.basename(url)
     print("[{}_{}] Downloading {}".format(s, v, name))
     file_path = os.path.join(dest_dir, name)
-    response = session.head(url, stream=True, headers=ADOBE_DL_HEADERS)
-    total_size_in_bytes = int(response.headers.get("content-length", 0))
-    if (
-        args.skipExisting
-        and os.path.isfile(file_path)
-        and os.path.getsize(file_path) == total_size_in_bytes
-    ):
-        print("[{}_{}] {} already exists, skipping\n".format(s, v, name))
-    else:
-        download_progress(url, file_path)
+    download_progress(url, file_path)
 
 
 def download_acrobat(appInfo, cdn):
@@ -529,9 +492,6 @@ def download_acrobat(appInfo, cdn):
         cdn + appInfo["manifestURL"], stream=True, headers=ADOBE_REQ_HEADERS
     )
     response.encoding = "utf-8"
-    # to study
-    with open("manifest.xml", "wb+") as f:
-        f.write(response.content)
     manifest = ET.fromstring(response.text)
 
     # for full app
@@ -608,6 +568,11 @@ def write_driver_xml(jsonData, products_dir, prefix=""):
             dep_dir = ET.SubElement(dep_sub, "EsdDirectory")
             dep_dir.text = "./" + dependency["SAPCode"]
 
+    if jsonData["SAPCode"] == "LTRM":
+        requestInfo = ET.SubElement(driver, "RequestInfo")
+        req_sub = ET.SubElement(requestInfo, "IsEnterpriseDeployment")
+        req_sub.text = "true"
+
     tree = ET.ElementTree(driver)
     ET.indent(tree, space="    ", level=0)
     xml_file = os.path.join(products_dir, prefix + "Driver.xml")
@@ -638,7 +603,7 @@ def condition_test(package, language, ProcessorFamily, condition):
         testSubject, testValue = condition.split("<")
         testOption = operator.lt
 
-        # start testing
+    # start testing
     if testSubject.strip() == "[OSProcessorFamily]":
         return testOption(testValue.strip(), ProcessorFamily)
     elif testSubject.strip() == "[OSVersion]":
@@ -755,6 +720,28 @@ def package_filter(package, language, platform):
     return urlPath, newPackage
 
 
+# https://stackoverflow.com/questions/71543579/python-find-and-replace-all-values-under-a-certain-key-in-a-nested-dictionary
+def language_filter(data, language):
+    key = "Language"
+    if isinstance(data, dict):
+        # filter by locale
+        filtered = {}
+        for k, v in data.items():
+            if k == key:
+                for lc in v:
+                    if lc["locale"] == language or lc["locale"] == "mul":
+                        filtered = [lc]
+        # replace with filtered result
+        return {
+            k: filtered if k == key and v else language_filter(v, language)
+            for k, v in data.items()
+        }
+    elif isinstance(data, list):
+        return [language_filter(v, language) for v in data]
+    else:
+        return data
+
+
 def dependencies_download(dep_data, products_dir, language, selectedPlatform):
     dep_dir = os.path.join(products_dir, dep_data["sapCode"])
     os.makedirs(dep_dir, exist_ok=True)
@@ -790,7 +777,7 @@ def package_download(app_json, package_dir, language, selectedPlatform):
     # filtered json data
     app_json["Packages"]["Package"] = package
 
-    print("\nCreate application.json\n")
+    print("\nCreating application.json")
     save_application_json(package_dir, app_json)
     for url in urls:
         file_download(cdn + url, package_dir, sapCode, version)
@@ -841,6 +828,9 @@ def run_ccdl(products, cdn, sapCodes, selectedPlatform):
 
     app_json = get_application_json(prodInfo["buildGuid"])
 
+    if installLanguage.lower() != "all" or installLanguage.lower() != "mul":
+        app_json = language_filter(app_json, installLanguage)
+
     package_download(app_json, package_dir, installLanguage, selectedPlatform)
 
     if "Dependencies" in app_json:
@@ -851,9 +841,16 @@ def run_ccdl(products, cdn, sapCodes, selectedPlatform):
                 depPackage, products_dir, installLanguage, selectedPlatform
             )
 
-    print("\nGenerating driver.xml")
+    print("Generating Driver.xml")
     prefix = app_json["SAPCode"] + "-"
     write_driver_xml(app_json, products_dir, prefix)
+
+    print(
+        "\nSuccessfully downloaded Adobe {} V-{}".format(
+            prodInfo["displayName"],
+            prodInfo["productVersion"],
+        )
+    )
 
     return
 
