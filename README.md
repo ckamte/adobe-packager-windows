@@ -19,7 +19,7 @@ python ccdl-win.py -u 6 -l en_US -p win64 -x
 1. Extract Set-up zip file
 2. Download desire package with ccdl-win
 3. Rename \products\\*prefix*-Driver.xml to Driver.xml
-4. Run installer.py
+4. Download packages for installer using installer.py
    ```
    python installer.py
    ```
