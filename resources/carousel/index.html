@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>PHSP installer slideshow</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="css/styles.css">
+<style>
+html {
+		background-color: #fff;
+}
+* {box-sizing: border-box;}
+body {
+	margin:0px;}
+.mySlides {opacity: 0; position: absolute; transition: all 1s;}
+img {vertical-align: middle;}
+
+/* Slideshow container */
+.slideshow-container {
+  max-width: 445px;
+  position: relative;
+  margin: auto;
+  cursor: pointer;
+}
+
+/* Caption text */
+.text {
+  font-family: 'AdobeClean', Helvetica, Arial, sans-serif;
+  color: #fff;
+  font-weight: 450;
+  font-size: 15px;
+  letter-spacing: .3;
+  padding-left: 20px;
+  position: absolute;
+  bottom: 95px;
+  width: 30%;
+  text-align: center;
+}
+
+/* Number text (1/3 etc) */
+.numbertext {
+	font-family: 'AdobeClean', Helvetica, Arial, sans-serif;
+  color: #f2f2f2;
+  font-size: 12px;
+  padding: 8px 12px;
+  position: absolute;
+  top: 0;
+}
+
+.active {
+  background-color: #717171;
+}
+
+/* Fading animation */
+.fade {
+  -webkit-animation-name: fade;
+  -webkit-animation-duration: 1s;
+  animation-name: fade;
+  animation-duration: 1s;
+}
+
+@-webkit-keyframes fade {
+  from {opacity: .7}
+  to {opacity: 1}
+}
+
+@keyframes fade {
+  from {opacity: .1}
+  to {opacity: 1}
+}
+
+/* On smaller screens, decrease text size */
+@media only screen and (max-width: 300px) {
+  .text {font-size: 11px}
+}
+</style>
+</head>
+<body>
+<div class="slideshow-container" id="slideContainer" href="#">
+
+<div class="mySlides fade" style="opacity: 1; visibility: visible;">
+    <video class="videos" autoplay loop muted style="width: 445px; height: 239px;"><source src="images/01_creativity_for_all_445x239.mp4" style="width: 445px; height: 239px;"></video>
+    <div class="text" id="slideText1">Creativity for all.</div>
+</div>
+
+</div>
+
+<script type="text/javascript" src="lib/jquery.min.js"></script>
+<script type="text/javascript" src="carousel.js"></script>
+</body>
+</html>
