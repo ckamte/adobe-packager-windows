@@ -16,7 +16,7 @@ python ccdl-win.py -u 6 -l en_US -p win64 -x
 6. Run Set-up.exe
 
 ## Create manually
-1. Extract Set-up zip file
+1. Extract Set-up zip file (v4 setup not support win10)
 2. Download desire package with ccdl-win
 3. Rename \products\\*prefix*-Driver.xml to Driver.xml
 4. Download packages for installer using installer.py
