@@ -936,8 +936,8 @@ def run_ccdl(products, cdn, sapCodes, selectedPlatform):
     app_json = get_application_json(prodInfo["buildGuid"])
 
     # filter out unused languages from Application.json file
-    # if installLanguage.lower() != "all":
-    #    app_json = language_filter(app_json, installLanguage)
+    if installLanguage.lower() != "all":
+        app_json = language_filter(app_json, installLanguage)
 
     if (
         package_download(app_json, package_dir, installLanguage, selectedPlatform)
