@@ -44,7 +44,7 @@ ADOBE_PRODUCTS_XML_URL = "https://prod-rel-ffc-ccm.oobesaas.adobe.com/adobe-ffc-
 ADOBE_APPLICATION_JSON_URL = "https://cdn-ffc.oobesaas.adobe.com/core/v3/applications"
 
 ADOBE_REQ_HEADERS = {
-    "X-Adobe-App-Id": "accc-apps-panel-desktop",
+    "X-Adobe-App-Id": "accc-hdcore-desktop",
     "User-Agent": "Adobe Application Manager 2.0",
     "X-Api-Key": "CC_HD_ESD_1_0",
     "Cookie": "fg="
@@ -163,7 +163,10 @@ def app_platform():
 
 def product_code(sapCodes):
     selectedCode = args.sapCode
-    if selectedCode and selectedCode.upper() not in sapCodes:
+    if selectedCode:
+        selectedCode = selectedCode.upper()
+
+    if selectedCode and selectedCode not in sapCodes:
         print("\nProvided SAP code ({}) is not available\n".format(selectedCode))
         answer = None
         while answer is None:
@@ -511,8 +514,7 @@ def file_download(url, dest_dir, s, v, name=None):
     if not name:
         name = os.path.basename(url)
     print("[{}_{}] Downloading {}".format(s, v, name))
-    file_path = os.path.join(dest_dir, name)
-    return download_progress(url, file_path)
+    return download_progress(url, dest_dir)
 
 
 def download_acrobat(appInfo, cdn):
@@ -530,13 +532,13 @@ def download_acrobat(appInfo, cdn):
     for asset in assetList:
         prodNum += 1
         assetPath = asset.find("./asset_path").text
-        assetName = os.path.basename(assetPath)
         baseVersion = asset.find(".//baseVersion")
         if baseVersion is not None:
             baseVersion = baseVersion.text
 
         productList[str(prodNum)] = {
-            "assetName": assetName,
+            "assetName": os.path.basename(assetPath),
+            "assetSize": asset.find("./asset_size").text,
             "downloadUrl": assetPath,
             "baseVersion": baseVersion,
         }
@@ -578,12 +580,10 @@ def download_acrobat(appInfo, cdn):
     sapCode = appInfo["sapCode"]
     version = appInfo["productVersion"]
     name = os.path.basename(downloadURL)
-
-    print("")
-    print("Download to: " + os.path.join(dest, name))
+    filePath = os.path.join(dest, name)
 
     if file_download(downloadURL, dest, sapCode, version, name) is True:
-        print("\n{} was successfully downloaded.".format(name))
+        print("\n{} was successfully downloaded to: {}".format(name, filePath))
     return
 
 
@@ -930,6 +930,8 @@ def run_ccdl(products, cdn, sapCodes, selectedPlatform):
     # create products directory
     products_dir = os.path.join(dest, "products")
     os.makedirs(products_dir, exist_ok=True)
+
+    # create product packages dir
     package_dir = os.path.join(products_dir, sapCode)
     os.makedirs(package_dir, exist_ok=True)
 
@@ -956,7 +958,7 @@ def run_ccdl(products, cdn, sapCodes, selectedPlatform):
     write_driver_xml(app_json, products_dir, prefix)
 
     print(
-        "\nSuccessfully downloaded Adobe {} V-{}".format(
+        "\nSuccessfully downloaded Adobe {} v-{}".format(
             prodInfo["displayName"],
             prodInfo["productVersion"],
         )
