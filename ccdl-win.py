@@ -37,7 +37,7 @@ except ImportError:
     )
 
 VERSION = 1
-VERSION_STR = "0.0.3"
+VERSION_STR = "1.0.0"
 CODE_QUALITY = "Really_AWFUL"
 
 ADOBE_PRODUCTS_XML_URL = "https://prod-rel-ffc-ccm.oobesaas.adobe.com/adobe-ffc-external/core/v{urlVersion}/products/all?_type=xml&channel=ccm&channel=sti&platform={installPlatform}&productType=Desktop"
@@ -163,7 +163,22 @@ def app_platform():
 
 def product_code(sapCodes):
     selectedCode = args.sapCode
-    if not selectedCode:
+    if selectedCode and selectedCode.upper() not in sapCodes:
+        print("\nProvided SAP code ({}) is not available\n".format(selectedCode))
+        answer = None
+        while answer is None:
+            answer = input("Are you want to continue? (y/n): ")
+            if answer.lower() in ["y", "yes"]:
+                print("")
+                selectedCode = None
+            elif answer.lower() in ["n", "no"]:
+                print("\nProgram terminated!\n")
+                exit()
+            else:
+                print("\nPlease enter yes or no!")
+                answer = None
+
+    if not selectedCode or selectedCode is None:
         for s, d in sapCodes.items():
             print("[{}]{}{}".format(s, (10 - len(s)) * " ", d))
 
@@ -298,7 +313,6 @@ def install_language(supportedLangs):
                         )
                     )
 
-    print("\nDownloading packages with {} language".format(installLanguage))
     return installLanguage
 
 
@@ -324,6 +338,10 @@ def parse_products_xml(products_url, url_version, allowed_platform, selected_pla
     response = session.get(products_url, stream=True, headers=ADOBE_REQ_HEADERS)
     response.encoding = "utf-8"
     products_xml = ET.fromstring(response.content)
+
+    # with open('products.xml', 'wb+') as f:
+    #    f.write(response.content)
+    # products_xml = ET.parse("products.xml")
 
     cdn = products_xml.find(".//*/cdn/secure").text
     allProducts = {}
@@ -360,10 +378,15 @@ def parse_products_xml(products_url, url_version, allowed_platform, selected_pla
                         languageSet = ls.attrib
                         productVersion = languageSet.get("productVersion")
 
-                        # manifest url for APRO
-                        manifestURL = ls.find("urls/manifestURL")
+                        manifestURL = ls.find(".//manifestURL")
                         if manifestURL is not None:
                             manifestURL = manifestURL.text
+
+                        if (
+                            productVersion is None
+                            and ls.find(".//appVersion") is not None
+                        ):
+                            productVersion = ls.find(".//appVersion").text
 
                         # get product with version
                         if productVersion is not None:
@@ -371,7 +394,7 @@ def parse_products_xml(products_url, url_version, allowed_platform, selected_pla
                                 "sapCode": sapCode,
                                 "displayName": displayName,
                                 "appPlatform": appPlatform,
-                                "productVersion": languageSet.get("productVersion"),
+                                "productVersion": productVersion,
                                 "supportedLanguages": product_languages(ls),
                                 "productIcons": product_icons(product),
                                 "buildGuid": languageSet.get("buildGuid"),
@@ -420,10 +443,6 @@ def get_products():
                 sapCodes[p["sapCode"]] = p["displayName"]
     print(str(len(sapCodes)) + " products found:")
 
-    if args.sapCode and products.get(args.sapCode.upper()) is None:
-        print("\nProvided SAP Code not found in products: " + args.sapCode)
-        exit(1)
-
     return products, cdn, sapCodes, selectedPlatform
 
 
@@ -433,35 +452,45 @@ def get_download_path():
         print("\nUsing provided destination: " + args.destination + "\n")
         dest = args.destination
     else:
-        print("\nDownloaded file will be put on current location.\n")
         dest = os.path.dirname(os.path.realpath(__name__))
     return dest
 
 
 def download_progress(url, dest_dir, prefix=""):
-    response = session.get(url, stream=True, headers=ADOBE_REQ_HEADERS)
+    # get file size
+    response = session.head(url, stream=False, headers=ADOBE_DL_HEADERS)
     total_size_in_bytes = int(response.headers.get("content-length", 0))
+
     if (
         args.skipExisting
         and os.path.isfile(dest_dir)
         and os.path.getsize(dest_dir) == total_size_in_bytes
     ):
         print("Downloaded file is OK, skipping ... \n")
-        return
+        return True
 
-    if total_size_in_bytes > 0:
-        block_size = 1024  # 1 Kibibyte
-        progress_bar = tqdm(total=total_size_in_bytes, unit="iB", unit_scale=True)
-        if prefix:
-            name = prefix + os.path.basename(url)
-            dest_dir = dest_dir + "\\" + name
-        with open(dest_dir, "wb") as file:
-            for data in response.iter_content(block_size):
-                progress_bar.update(len(data))
-                file.write(data)
-        progress_bar.close()
-        if total_size_in_bytes != 0 and progress_bar.n != total_size_in_bytes:
-            print("ERROR, something went wrong")
+    # download file
+    response = session.get(url, stream=True, headers=ADOBE_REQ_HEADERS)
+
+    filename = os.path.basename(url)
+    if prefix:
+        filename = prefix + filename
+
+    dest_dir = os.path.join(dest_dir, filename)
+    block_size = 1024  # 1 Kibibyte
+    progress_bar = tqdm(total=total_size_in_bytes, unit="iB", unit_scale=True)
+    with open(dest_dir, "wb") as file:
+        for data in response.iter_content(block_size):
+            progress_bar.update(len(data))
+            file.write(data)
+
+    progress_bar.close()
+
+    if total_size_in_bytes != 0 and progress_bar.n != total_size_in_bytes:
+        print("Cannot determine download size!")
+        return False
+    else:
+        return True
 
 
 def icons_download(product, dest_dir):
@@ -483,25 +512,67 @@ def file_download(url, dest_dir, s, v, name=None):
         name = os.path.basename(url)
     print("[{}_{}] Downloading {}".format(s, v, name))
     file_path = os.path.join(dest_dir, name)
-    download_progress(url, file_path)
+    return download_progress(url, file_path)
 
 
 def download_acrobat(appInfo, cdn):
-    """Download manifest.xml"""
+    # download manifest file
     response = session.get(
         cdn + appInfo["manifestURL"], stream=True, headers=ADOBE_REQ_HEADERS
     )
     response.encoding = "utf-8"
     manifest = ET.fromstring(response.text)
 
-    # for full app
-    assetList = manifest.find("app_modes/app_mode/asset_list")
+    # check available products
+    assetList = manifest.findall("./asset_list/asset")
+    productList = {}
+    prodNum = 0
     for asset in assetList:
-        if asset.find("asset_type").text == "EXE":
-            downloadURL = asset.find("asset_path").text
+        prodNum += 1
+        assetPath = asset.find("./asset_path").text
+        assetName = os.path.basename(assetPath)
+        baseVersion = asset.find(".//baseVersion")
+        if baseVersion is not None:
+            baseVersion = baseVersion.text
 
-    # for update
-    # downloadURL = manifest.find('asset_list/asset/asset_path').text
+        productList[str(prodNum)] = {
+            "assetName": assetName,
+            "downloadUrl": assetPath,
+            "baseVersion": baseVersion,
+        }
+
+    selectedCode = None
+    while selectedCode is None:
+        print("\nAvailable downloads\n")
+        for n, p in productList.items():
+            if p["baseVersion"] is None:
+                print(
+                    "{}. {}{} Full Installer".format(
+                        n, p["assetName"], (35 - len(p["assetName"])) * " "
+                    )
+                )
+            else:
+                print(
+                    "{}. {}{} Update package for version {}".format(
+                        n,
+                        p["assetName"],
+                        (35 - len(p["assetName"])) * " ",
+                        p["baseVersion"],
+                    )
+                )
+
+        val = input(
+            "\nPlease enter the number of the desired product from the list above: "
+        )
+
+        if val in productList:
+            selectedCode = val
+        elif val == "":
+            print("No product selected! Please use a value from the list above.")
+        else:
+            print("{} is not available! Please check your input.".format(val))
+
+    downloadURL = productList[val]["downloadUrl"]
 
     dest = get_download_path()
     sapCode = appInfo["sapCode"]
@@ -509,14 +580,10 @@ def download_acrobat(appInfo, cdn):
     name = os.path.basename(downloadURL)
 
     print("")
-    print("dest: " + os.path.join(dest, name))
+    print("Download to: " + os.path.join(dest, name))
 
-    print("\nDownloading...\n")
-
-    print("[{}_{}] Selected 1 package".format(sapCode, version))
-    file_download(downloadURL, dest, sapCode, version, name)
-
-    print("\nInstaller successfully downloaded.")
+    if file_download(downloadURL, dest, sapCode, version, name) is True:
+        print("\n{} was successfully downloaded.".format(name))
     return
 
 
@@ -529,53 +596,84 @@ def get_application_json(buildGuid):
     return json.loads(response.content)
 
 
-def save_application_json(package_dir, json_data):
-    app_json_path = os.path.join(package_dir, "application.json")
+def save_application_json(pkg_dir, json_data):
+    app_json_path = os.path.join(pkg_dir, "Application.json")
     with open(app_json_path, "w+") as file:
         json.dump(json_data, file, separators=(",", ":"))
 
 
-def write_driver_xml(jsonData, products_dir, prefix=""):
-    driver = ET.Element("DriverInfo")
-    product = ET.SubElement(driver, "ProductInfo")
+def write_driver_xml(json, pds_dir, prefix=""):
+    driverInfo = ET.Element("DriverInfo")
+    productInfo = ET.SubElement(driverInfo, "ProductInfo")
+    for key, val in dict(
+        {
+            "Name": "Adobe {}".format(json["Name"]),
+            "SAPCode": json["SAPCode"],
+            "CodexVersion": json["CodexVersion"],
+            "BaseVersion": json["BaseVersion"],
+            "Platform": json["Platform"],
+            "EsdDirectory": (os.path.join("./", json["SAPCode"])),
+        }
+    ).items():
+        child = ET.Element(key)
+        child.text = str(val)
+        productInfo.append(child)
 
-    prd_name = ET.SubElement(product, "Name")
-    prd_name.text = "Adobe " + jsonData["Name"]
+    if "Dependencies" in json:
+        dep_root = ET.SubElement(productInfo, "Dependencies")
+        for d in json["Dependencies"]["Dependency"]:
+            deps = ET.Element("Dependency")
+            for key, val in dict(
+                {
+                    "SAPCode": d["SAPCode"],
+                    "BaseVersion": d["BaseVersion"],
+                    "EsdDirectory": (os.path.join("./", d["SAPCode"])),
+                }
+            ).items():
+                child = ET.Element(key)
+                child.text = str(val)
+                deps.append(child)
+            dep_root.append(deps)
 
-    sap_code = ET.SubElement(product, "SAPCode")
-    sap_code.text = jsonData["SAPCode"]
+    # for url > v5
+    if "IsNonCCProduct" in json and "IsNglEnabled" in json:
+        for key, val in dict(
+            {
+                "IsNonCCProduct": json["IsNonCCProduct"],
+                "IsNglEnabled": True if "NglLicensingInfo" in json else False,
+            }
+        ).items():
+            child = ET.Element(key)
+            child.text = str(val)
+            productInfo.append(child)
 
-    cod_ver = ET.SubElement(product, "CodexVersion")
-    cod_ver.text = jsonData["CodexVersion"]
+    lang_root = ET.SubElement(productInfo, "SupportedLanguages")
+    for lg in json["SupportedLanguages"]["Language"]:
+        for key, val in dict({"Language": ""}).items():
+            child = ET.Element(key)
+            child.set("locale", lg["locale"])
+            lang_root.append(child)
 
-    base_ver = ET.SubElement(product, "BaseVersion")
-    base_ver.text = jsonData["BaseVersion"]
+    # suppress error on dep package download
+    if "MinimumSupportedClientVersion" in json and "HDBuilderVersion" in json:
+        for key, val in dict(
+            {
+                "MinimumSupportedClientVersion": json["MinimumSupportedClientVersion"],
+                "HDBuilderVersion": json["HDBuilderVersion"],
+            }
+        ).items():
+            child = ET.Element(key)
+            child.text = str(val)
+            productInfo.append(child)
 
-    platform = ET.SubElement(product, "Platform")
-    platform.text = jsonData["Platform"]
-
-    esd_dir = ET.SubElement(product, "EsdDirectory")
-    esd_dir.text = "./" + jsonData["SAPCode"]
-
-    if "Dependencies" in jsonData:
-        dep_top = ET.SubElement(product, "Dependencies")
-        for dependency in jsonData["Dependencies"]["Dependency"]:
-            dep_sub = ET.SubElement(dep_top, "Dependency")
-            dep_code = ET.SubElement(dep_sub, "SAPCode")
-            dep_code.text = dependency["SAPCode"]
-            dep_base = ET.SubElement(dep_sub, "BaseVersion")
-            dep_base.text = dependency["BaseVersion"]
-            dep_dir = ET.SubElement(dep_sub, "EsdDirectory")
-            dep_dir.text = "./" + dependency["SAPCode"]
-
-    if jsonData["SAPCode"] == "LTRM":
-        requestInfo = ET.SubElement(driver, "RequestInfo")
+    if json["SAPCode"] == "LTRM":
+        requestInfo = ET.SubElement(driverInfo, "RequestInfo")
         req_sub = ET.SubElement(requestInfo, "IsEnterpriseDeployment")
         req_sub.text = "true"
 
-    tree = ET.ElementTree(driver)
+    tree = ET.ElementTree(driverInfo)
     ET.indent(tree, space="    ", level=0)
-    xml_file = os.path.join(products_dir, prefix + "Driver.xml")
+    xml_file = os.path.join(pds_dir, prefix + "Driver.xml")
     tree.write(xml_file, encoding="utf-8", xml_declaration=True)
 
 
@@ -623,26 +721,23 @@ def condition_test(package, language, ProcessorFamily, condition):
 def condition_filter(package, language, ProcessorFamily):
     conditions = []
     conditionString = package["Condition"].strip()
-    result = False
     if "&&" in conditionString:
         conditions = conditionString.split("&&")
         for condition in conditions:
-            result = True
-            if condition_test(package, language, ProcessorFamily, condition) == False:
-                result = False
+            testResult = condition_test(package, language, ProcessorFamily, condition)
+            if testResult is False:
                 break
 
     elif "||" in conditionString:
         conditions = conditionString.split("||")
         for condition in conditions:
-            result = False
-            if condition_test(package, language, ProcessorFamily, condition) == True:
-                result = True
+            testResult = condition_test(package, language, ProcessorFamily, condition)
+            if testResult is True:
                 break
     else:
-        result = condition_test(package, language, ProcessorFamily, conditionString)
+        testResult = condition_test(package, language, ProcessorFamily, conditionString)
 
-    return result
+    return testResult
 
 
 def language_for_premiere(language):
@@ -742,29 +837,39 @@ def language_filter(data, language):
         return data
 
 
-def dependencies_download(dep_data, products_dir, language, selectedPlatform):
-    dep_dir = os.path.join(products_dir, dep_data["sapCode"])
-    os.makedirs(dep_dir, exist_ok=True)
-    dep_data = list(dep_data["versions"].values())
-    firstItem = dep_data[0]
-    dep_json = get_application_json(firstItem["buildGuid"])
-    package_download(dep_json, dep_dir, language, selectedPlatform)
+def dependencies_download(json, products, pds_dir, installLanguage, selectedPlatform):
+    for dependency in json["Dependencies"]["Dependency"]:
+        depSap = dependency["SAPCode"]
+        dep_dir = os.path.join(pds_dir, depSap)
+        os.makedirs(dep_dir, exist_ok=True)
+
+        depPackage = products.get(depSap)
+        dep_data = list(depPackage["versions"].values())
+        firstItem = dep_data[0]
+        dep_json = get_application_json(firstItem["buildGuid"])
+        if (
+            package_download(dep_json, dep_dir, installLanguage, selectedPlatform)
+            is False
+        ):
+            print("\nCannot download dependency package")
+            break
+    return
 
 
-def package_download(app_json, package_dir, language, selectedPlatform):
-    allPackages = app_json["Packages"]["Package"]
-    cdn = app_json["Cdn"]["Secure"]
-    sapCode = app_json["SAPCode"]
-    version = app_json["ProductVersion"]
+def package_download(json, pkg_dir, language, selectedPlatform):
+    allPackages = json["Packages"]["Package"]
+    cdn = json["Cdn"]["Secure"]
+    sapCode = json["SAPCode"]
+    version = json["ProductVersion"]
     urls, package = package_filter(allPackages, language, selectedPlatform)
 
     # module filter
-    if "Modules" in app_json:
+    if "Modules" in json:
         packageNames = []
         for names in package:
             packageNames.append(names["PackageName"])
 
-        allModules = app_json["Modules"]["Module"]
+        allModules = json["Modules"]["Module"]
         newModules = []
         for module in allModules:
             refPackage = module["ReferencePackages"]["ReferencePackage"]
@@ -772,15 +877,17 @@ def package_download(app_json, package_dir, language, selectedPlatform):
                 if names in packageNames:
                     newModules.append(module)
 
-        app_json["Modules"]["Module"] = newModules
+        json["Modules"]["Module"] = newModules
 
     # filtered json data
-    app_json["Packages"]["Package"] = package
+    json["Packages"]["Package"] = package
 
-    print("\nCreating application.json")
-    save_application_json(package_dir, app_json)
+    print("\nCreating Application.json")
+    save_application_json(pkg_dir, json)
     for url in urls:
-        file_download(cdn + url, package_dir, sapCode, version)
+        if file_download(cdn + url, pkg_dir, sapCode, version) is False:
+            return False
+    return True
 
 
 def run_ccdl(products, cdn, sapCodes, selectedPlatform):
@@ -828,18 +935,21 @@ def run_ccdl(products, cdn, sapCodes, selectedPlatform):
 
     app_json = get_application_json(prodInfo["buildGuid"])
 
-    if installLanguage.lower() != "all":
-        app_json = language_filter(app_json, installLanguage)
+    # filter out unused languages from Application.json file
+    # if installLanguage.lower() != "all":
+    #    app_json = language_filter(app_json, installLanguage)
 
-    package_download(app_json, package_dir, installLanguage, selectedPlatform)
+    if (
+        package_download(app_json, package_dir, installLanguage, selectedPlatform)
+        is False
+    ):
+        print("\nCannot download all packages")
 
     if "Dependencies" in app_json:
-        for dependency in app_json["Dependencies"]["Dependency"]:
-            depSap = dependency["SAPCode"]
-            depPackage = products.get(depSap)
-            dependencies_download(
-                depPackage, products_dir, installLanguage, selectedPlatform
-            )
+        print("\nDownloading dependencies")
+        dependencies_download(
+            app_json, products, products_dir, installLanguage, selectedPlatform
+        )
 
     print("Generating Driver.xml")
     prefix = app_json["SAPCode"] + "-"
@@ -914,8 +1024,12 @@ if __name__ == "__main__":
     products, cdn, sapCodes, selectedPlatform = get_products()
 
     while True:
-        run_ccdl(products, cdn, sapCodes, selectedPlatform)
-        if args.noRepeatPrompt or not questiony(
-            "\n\nDo you want to download another package"
-        ):
-            break
+        try:
+            run_ccdl(products, cdn, sapCodes, selectedPlatform)
+            if args.noRepeatPrompt or not questiony(
+                "\n\nDo you want to download another package"
+            ):
+                break
+        except KeyboardInterrupt:
+            print("\nProgram was terminated by user")
+            sys.exit()
