@@ -464,14 +464,6 @@ def download_progress(url, dest_dir, prefix=""):
     response = session.head(url, stream=False, headers=ADOBE_DL_HEADERS)
     total_size_in_bytes = int(response.headers.get("content-length", 0))
 
-    if (
-        args.skipExisting
-        and os.path.isfile(dest_dir)
-        and os.path.getsize(dest_dir) == total_size_in_bytes
-    ):
-        print("Downloaded file is OK, skipping ... \n")
-        return True
-
     # download file
     response = session.get(url, stream=True, headers=ADOBE_REQ_HEADERS)
 
@@ -480,6 +472,15 @@ def download_progress(url, dest_dir, prefix=""):
         filename = prefix + filename
 
     dest_dir = os.path.join(dest_dir, filename)
+
+    if (
+        args.skipExisting
+        and os.path.isfile(dest_dir)
+        and os.path.getsize(dest_dir) == total_size_in_bytes
+    ):
+        print("Downloaded file is OK, skipping ... \n")
+        return True
+
     block_size = 1024  # 1 Kibibyte
     progress_bar = tqdm(total=total_size_in_bytes, unit="iB", unit_scale=True)
     with open(dest_dir, "wb") as file:
@@ -807,7 +808,7 @@ def package_filter(package, language, platform):
                     noneCoreCount += 1
 
     print(
-        "Selected {} core packages and {} non-core packages".format(
+        "\nSelected {} core packages and {} non-core packages".format(
             coreCount, noneCoreCount
         )
     )
@@ -882,8 +883,11 @@ def package_download(json, pkg_dir, language, selectedPlatform):
     # filtered json data
     json["Packages"]["Package"] = package
 
-    print("\nCreating Application.json")
+    print("\nCreating Application.json\n")
+    
     save_application_json(pkg_dir, json)
+
+    # download packages
     for url in urls:
         if file_download(cdn + url, pkg_dir, sapCode, version) is False:
             return False
@@ -941,6 +945,7 @@ def run_ccdl(products, cdn, sapCodes, selectedPlatform):
     if installLanguage.lower() != "all":
         app_json = language_filter(app_json, installLanguage)
 
+    print("\nDownloading main app package")
     if (
         package_download(app_json, package_dir, installLanguage, selectedPlatform)
         is False
@@ -948,7 +953,7 @@ def run_ccdl(products, cdn, sapCodes, selectedPlatform):
         print("\nCannot download all packages")
 
     if "Dependencies" in app_json:
-        print("\nDownloading dependencies")
+        print("\nDownloading dependency packages")
         dependencies_download(
             app_json, products, products_dir, installLanguage, selectedPlatform
         )
