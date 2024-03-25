@@ -53,9 +53,9 @@ def setup_version():
     jsonFromPowerShell = subprocess.run(
         [
             "powershell.exe",
-            "(Get-Item "
+            "(Get-Item '"
             + ADOBE_SETUP_BIN
-            + ").VersionInfo.FileVersion | ConvertTo-Json",
+            + "').VersionInfo.FileVersion | ConvertTo-Json",
         ],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
