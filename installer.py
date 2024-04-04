@@ -91,7 +91,7 @@ def extract_zip(zip):
     with zipfile.ZipFile(zip, "r") as cp:
         for f in cp.namelist():
             bname = os.path.basename(f)
-            if bname is not "":
+            if bname != "":
                 fname = os.path.join(fpath, bname)
                 unpacked = open(fname, "wb")
                 unpacked.write(cp.read(f))
@@ -223,8 +223,8 @@ def get_packages():
                     "name": packageName,
                     "sequenceNumber": pk.find("sequenceNumber").text,
                     "optional": pk.find("optional").text,
-                    "pimxPath": "/"
-                    + "/".join([setName, packageName, packageName + ".pimx"]),
+                    "pimxPath": "\\"
+                    + "\\".join([setName, packageName, packageName + ".pimx"]),
                 }
             ).items():
                 child = ET.Element(key)
