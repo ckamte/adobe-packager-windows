@@ -84,6 +84,20 @@ def get_xml_data(url):
     return ET.fromstring(response.content)
 
 
+def extract_zip(zip):
+    zipName = os.path.basename(zip)
+    print(f"Extracting {zipName} contents\n")
+    fpath = os.path.dirname(zip)
+    with zipfile.ZipFile(zip, "r") as cp:
+        for f in cp.namelist():
+            bname = os.path.basename(f)
+            if bname is not "":
+                fname = os.path.join(fpath, bname)
+                unpacked = open(fname, "wb")
+                unpacked.write(cp.read(f))
+                unpacked.close()
+
+
 def file_download(url, dest_dir):
     response = session.get(url, stream=True, headers=ADOBE_REQ_HEADERS)
     total_size_in_bytes = int(response.headers.get("content-length", 0))
@@ -96,6 +110,7 @@ def file_download(url, dest_dir):
             os.path.isfile(dest_dir)
             and os.path.getsize(dest_dir) == total_size_in_bytes
         ):
+            extract_zip(dest_dir)
             print("Downloaded file is OK. Skipping ...")
             return
 
@@ -108,6 +123,8 @@ def file_download(url, dest_dir):
         progress_bar.close()
         if total_size_in_bytes != 0 and progress_bar.n != total_size_in_bytes:
             print("ERROR, something went wrong")
+
+        extract_zip(dest_dir)
 
 
 def get_packages():
@@ -125,7 +142,9 @@ def get_packages():
     accVersion = xml_data.find(".//application/version").text
 
     if accVersion != setupVersion:
-        print("\nYour installer will not work! Please try Adobe Installer version 5x or 6x\n")
+        print(
+            "\nYour installer will not work! Please try Adobe Installer version 5x or 6x\n"
+        )
         exit(1)
 
     package_cdn = xml_data.find(".//cdn/secure").text
@@ -167,7 +186,7 @@ def get_packages():
         for key, val in dict(
             {
                 "name": setName,
-                "installPath": set.find("installPath").text,
+                "installPath": installPath,
                 "sequenceNumber": set.find("sequenceNumber").text,
             }
         ).items():
