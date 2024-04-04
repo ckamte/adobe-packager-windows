@@ -24,4 +24,5 @@ python ccdl-win.py -u 6 -l en_US -p win64 -x
    python installer.py
    ```
 5. Rename and replace icons in \resources\content\images (from icons folder \*prefix*96x96.png to appicon.png \*prefix*122x192.png to appicon2x.png)
-6. Run Set-up.exe
+6. Delete downloaded zip files in packages directory to reduce installer size
+7. Run Set-up.exe
