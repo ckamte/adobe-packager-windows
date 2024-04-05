@@ -21,7 +21,7 @@ python ccdl-win.py -u 6 -l en_US -p win64 -x
 3. Rename \products\\*prefix*-Driver.xml to Driver.xml
 4. Download packages for installer using installer.py
    ```
-   python installer.py
+   python build-installer.py
    ```
 5. Rename and replace icons in \resources\content\images (from icons folder \*prefix*96x96.png to appicon.png \*prefix*122x192.png to appicon2x.png)
 6. Delete downloaded zip files in packages directory to reduce installer size
