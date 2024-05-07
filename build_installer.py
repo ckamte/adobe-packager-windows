@@ -1,5 +1,13 @@
+"""
+This is the downloader for required packages for Adobe Setup.
+
+v 1.1.0
+Add support for Adobe CC 6.2.0.x
+
+Download packages only!
+"""
+
 import os
-import io
 import sys
 import platform
 import subprocess
@@ -7,6 +15,7 @@ import string
 import json
 import random
 import zipfile
+import time
 from xml.etree import ElementTree as ET
 
 try:
@@ -27,7 +36,7 @@ except ImportError:
         or run: pip3 install tqdm."""
     )
 
-VERSION_STR = "1.0.0"
+VERSION_STR = "1.1.0"
 
 ACC_URL = "https://cdn-ffc.oobesaas.adobe.com/core/v1/applications?name=CreativeCloud&name=CCLBS&osVersion={osVersion}&platform={osPlatform}&version={appVersion}"
 
@@ -84,39 +93,55 @@ def get_xml_data(url):
     return ET.fromstring(response.content)
 
 
-def extract_zip(zip):
+def extract_zip(zip, dest):
     zipName = os.path.basename(zip)
-    print(f"Extracting {zipName} contents\n")
-    fpath = os.path.dirname(zip)
+    print(f"Extracting {zipName} contents")
+    
+    dir_name = os.path.basename(dest)
+    
     with zipfile.ZipFile(zip, "r") as cp:
-        for f in cp.namelist():
-            bname = os.path.basename(f)
-            if bname != "":
-                fname = os.path.join(fpath, bname)
-                unpacked = open(fname, "wb")
-                unpacked.write(cp.read(f))
-                unpacked.close()
+        for f in cp.infolist():
+            filename = f.filename
+            
+            #  exclude for folder
+            if filename.endswith('/'):
+                continue
+            
+            basename = os.path.basename(filename)
+            if dir_name in filename and not filename.endswith('/'):
+                # for < v6.2
+                dest_file = os.path.join(dest, basename)
+                with open(dest_file, "wb") as w:
+                    w.write(cp.read(filename))
+                filename = basename
+            else:
+                cp.extract(f, dest)
+            
+            # retain file creation date
+            name = os.path.join(dest, filename)
+            date_time = time.mktime(f.date_time + (0, 0, -1))
+            os.utime(name, (date_time, date_time))
 
 
-def file_download(url, dest_dir):
+def file_download(url, source_dir, dest_dir):
     response = session.get(url, stream=True, headers=ADOBE_REQ_HEADERS)
     total_size_in_bytes = int(response.headers.get("content-length", 0))
 
     if total_size_in_bytes > 0:
         name = os.path.basename(url)
-        dest_dir = os.path.join(dest_dir, name)
+        source_zip = os.path.join(source_dir, name)
 
         if (
-            os.path.isfile(dest_dir)
-            and os.path.getsize(dest_dir) == total_size_in_bytes
+            os.path.isfile(source_zip)
+            and os.path.getsize(source_zip) == total_size_in_bytes
         ):
-            extract_zip(dest_dir)
             print("Downloaded file is OK. Skipping ...")
+            extract_zip(source_zip, dest_dir)
             return
 
         block_size = 1024  # 1 Kibibyte
         progress_bar = tqdm(total=total_size_in_bytes, unit="iB", unit_scale=True)
-        with open(dest_dir, "wb") as file:
+        with open(source_zip, "wb") as file:
             for data in response.iter_content(block_size):
                 progress_bar.update(len(data))
                 file.write(data)
@@ -124,7 +149,7 @@ def file_download(url, dest_dir):
         if total_size_in_bytes != 0 and progress_bar.n != total_size_in_bytes:
             print("ERROR, something went wrong")
 
-        extract_zip(dest_dir)
+        extract_zip(source_zip, dest_dir)
 
 
 def get_packages():
@@ -170,6 +195,10 @@ def get_packages():
         xml_root.append(child)
 
     xml_packagesets = ET.SubElement(xml_root, "packageSets")
+    
+    # create dir for sources files
+    zip_dir = os.path.join(CURR_PATH, "acc_sources")
+    os.makedirs(zip_dir, exist_ok=True)
 
     # create packages dir
     packages_dir = os.path.join(CURR_PATH, "packages")
@@ -215,7 +244,7 @@ def get_packages():
             os.makedirs(sub_pkg_dir, exist_ok=True)
             assets = manifestXml.find(".//asset_list/asset/asset_path").text
             print("\nDownloading package: " + packageName)
-            file_download(assets, sub_pkg_dir)
+            file_download(assets, zip_dir, sub_pkg_dir)
 
             xml_package = ET.SubElement(xml_packages, "package")
             for key, val in dict(
@@ -258,25 +287,33 @@ def get_packages():
     xml_file = os.path.join(packages_dir, "ApplicationInfo.xml")
     tree.write(xml_file, encoding="utf-8", xml_declaration=True)
 
-    get_pim_dll(packages_dir)
+    if get_pim_dll(packages_dir):
+        print("\nSuccessfully downloaded installer files\n")
 
 
 def get_pim_dll(packages_dir):
     print("\nGetting AdobePIM.dll")
-    res_dir = "resources"
+    
+    # create resources dir
+    res_dir = os.path.join(CURR_PATH, "resources")
     os.makedirs(res_dir, exist_ok=True)
-
-    core_package = os.path.join(packages_dir, "ADC", "Core", "Core.zip")
-    with zipfile.ZipFile(core_package, "r") as cp:
-        for file in cp.namelist():
-            if file.endswith("AdobePIM.dll"):
-                cp.extract(file, res_dir)
-            elif file.endswith("Core.pima"):
-                pimaData = io.BytesIO(cp.read(file))
-                with zipfile.ZipFile(pimaData) as pima:
-                    for pim in pima.namelist():
-                        if pim.endswith("AdobePIM.dll"):
-                            pima.extract(pim, res_dir)
+    
+    core_dir = os.path.join(packages_dir, "ADC", "Core")
+    dll_file = os.path.join(core_dir, "AdobePIM.dll")
+    pima_file = os.path.join(core_dir, "Core.pima")
+    
+    if os.path.isfile(dll_file):
+        os.popen("copy " + dll_file + " " + res_dir)
+    elif os.path.isfile(pima_file):
+        with zipfile.ZipFile(pima_file) as pima:
+            for pim in pima.namelist():
+                if pim.endswith("AdobePIM.dll"):
+                    pima.extract(pim, res_dir)
+    else:
+        print("Cannot found AdobePIM.dll! Please search manually or installer won't work")
+        return False
+    
+    return True
 
 
 if __name__ == "__main__":
@@ -288,5 +325,3 @@ if __name__ == "__main__":
     )
 
     get_packages()
-
-    print("\nSuccessfully downloaded installer files\n")
