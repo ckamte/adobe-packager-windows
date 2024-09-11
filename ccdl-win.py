@@ -40,7 +40,7 @@ VERSION = 1
 VERSION_STR = "1.0.0"
 CODE_QUALITY = "Really_AWFUL"
 
-ADOBE_PRODUCTS_XML_URL = "https://prod-rel-ffc-ccm.oobesaas.adobe.com/adobe-ffc-external/core/v{urlVersion}/products/all?_type=xml&channel=ccm&channel=sti&platform={installPlatform}&productType=Desktop"
+ADOBE_PRODUCTS_XML_URL = "https://prod-rel-ffc-ccm.oobesaas.adobe.com/adobe-ffc-external/core/v{urlVersion}/products/all?channel=ccm&channel=sti&platform={installPlatform}&productType=Desktop&_type=xml"
 ADOBE_APPLICATION_JSON_URL = "https://cdn-ffc.oobesaas.adobe.com/core/v3/applications"
 
 ADOBE_REQ_HEADERS = {
@@ -342,9 +342,9 @@ def parse_products_xml(products_url, url_version, allowed_platform, selected_pla
     response.encoding = "utf-8"
     products_xml = ET.fromstring(response.content)
 
-    # with open('products.xml', 'wb+') as f:
+    #with open("ffc.xml", "wb+") as f:
     #    f.write(response.content)
-    # products_xml = ET.parse("products.xml")
+    # products_xml = ET.parse("ffc.xml")
 
     cdn = products_xml.find(".//*/cdn/secure").text
     allProducts = {}
@@ -399,10 +399,11 @@ def parse_products_xml(products_url, url_version, allowed_platform, selected_pla
                                 "appPlatform": appPlatform,
                                 "productVersion": productVersion,
                                 "supportedLanguages": product_languages(ls),
-                                "productIcons": product_icons(product),
                                 "buildGuid": languageSet.get("buildGuid"),
                                 "manifestURL": manifestURL,
                             }
+                            if args.productIcons: 
+                                allProducts[sapCode]["versions"][productVersion]['productIcons'] = product_icons(product)
                         else:
                             if url_version >= 5:
                                 allProducts.pop(sapCode, None)
@@ -884,7 +885,7 @@ def package_download(json, pkg_dir, language, selectedPlatform):
     json["Packages"]["Package"] = package
 
     print("\nCreating Application.json\n")
-    
+
     save_application_json(pkg_dir, json)
 
     # download packages
@@ -929,7 +930,8 @@ def run_ccdl(products, cdn, sapCodes, selectedPlatform):
     dest = get_download_path()
 
     # download icons
-    icons_download(prodInfo, dest)
+    if args.productIcons:
+        icons_download(prodInfo, dest)
 
     # create products directory
     products_dir = os.path.join(dest, "products")
@@ -1016,8 +1018,15 @@ if __name__ == "__main__":
         action="store",
     )
     parser.add_argument(
+        "-n",
         "--noRepeatPrompt",
         help="Don't prompt for additional downloads",
+        action="store_true",
+    )
+    parser.add_argument(
+        "-i",
+        "--productIcons",
+        help="Get app icons",
         action="store_true",
     )
     parser.add_argument(
