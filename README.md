@@ -29,7 +29,7 @@ python ccdl-win.py -u 6 -l en_US -p win64 -x
 5. Along the "packages" folder, a new "acc_sources" folder will be created as well (this contains the zip files of the ACC packages which were extracted before)
 6. Optional - Delete downloaded zip files in "acc_sources" directory to reduce installer size (Not necessary because omitting the folder if the whole installation is packed is valid and if kept, used for other products)
 7. Run Set-up.exe to install the product.
-8. Make sure AdobePIM.dll file version in "resources" folder matches the Set-Up.exe file version.
+8. Note - Make sure AdobePIM.dll file version in "resources" folder matches the Set-Up.exe file version.
 
 ~~## Install with CCMaker~~
 ~~You can also install with ccmaker.exe (tested with v-1.3.16.0). *Crack won't work*.~~
