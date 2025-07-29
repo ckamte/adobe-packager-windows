@@ -1,4 +1,9 @@
-# Usage
+## Prerequisites
+
+1. You need Python environment to run the commands.
+2. Go to ```https://www.python.org/downloads/``` and install the latest version.
+
+## Usage
 
 ```
 python ccdl-win.py -h
