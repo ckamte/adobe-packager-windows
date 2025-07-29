@@ -11,7 +11,7 @@ python ccdl-win.py -u 6 -l All -x
 python ccdl-win.py -u 6 -l en_US -p win64 -x
 ```
 
-## Installer for standalone product
+## Installer for standalone product (I don't know for what purpose this??)
 
 1. Get old working installer
 2. Replace all files and folder in \products
@@ -21,17 +21,16 @@ python ccdl-win.py -u 6 -l en_US -p win64 -x
 6. Run Set-up.exe
 
 ## Create manually
-1. Extract Set-up.exe file to current folder (v4 setup not support win10)
-3. Download desire package with ccdl-win
+
+1. Extract the whole branch to a working folder and pick one Set-up.exe version and extract it to the same folder. (v4 setup not support win10)
+2. Download desire product using ccdl-win.py (creates "products" folder inside the working folder)
+3. Download ACC packages for the installer using installer.py (creates "packages" folder inside the working folder)
 4. Rename \products\\*prefix*-Driver.xml to Driver.xml
-5. Download packages for installer using installer.py
-   ```
-   python build_installer.py
-   ```
-6. New folder "packages" will appear.
-7. Delete downloaded zip files in "packages" directory to reduce installer size
-8. Rename and replace icons in \resources\content\images (from icons folder \*prefix*96x96.png to appicon.png \*prefix*122x192.png to appicon2x.png)
-9. Run Set-up.exe
+5. Along the "packages" folder, a new "acc_sources" folder will be created as well (this contains the zip files of the ACC packages which were extracted before)
+6. Optional - Delete downloaded zip files in "acc_sources" directory to reduce installer size (Not necessary because omitting the folder if the whole installation is packed is valid and if kept, used for other products)
+~~7. Rename and replace icons in \resources\content\images (from icons folder \*prefix*96x96.png to appicon.png \*prefix*122x192.png to appicon2x.png)~~ - not necessary anymore, those files are OK.
+8. Run Set-up.exe to install the product.
+**9. Make sure AdobePIM.dll file version in "resources" folder matches the Set-Up.exe file version.**
 
 ~~## Install with CCMaker~~
 ~~You can also install with ccmaker.exe (tested with v-1.3.16.0). *Crack won't work*.~~
