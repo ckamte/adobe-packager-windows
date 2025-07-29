@@ -28,7 +28,7 @@ python ccdl-win.py -u 6 -l en_US -p win64 -x
 8. Rename and replace icons in \resources\content\images (from icons folder \*prefix*96x96.png to appicon.png \*prefix*122x192.png to appicon2x.png)
 9. Run Set-up.exe
 
-## Install with CCMaker
+~## Install with CCMaker
 You can also install with ccmaker.exe (tested with v-1.3.16.0). *Crack won't work*.
 1. Rename desired \products\\*prefix*-Driver.xml to Driver.xml
-2. Run CCMaker and select Driver.xml.
+2. Run CCMaker and select Driver.xml.~
