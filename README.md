@@ -28,9 +28,8 @@ python ccdl-win.py -u 6 -l en_US -p win64 -x
 4. Rename \products\\*prefix*-Driver.xml to Driver.xml
 5. Along the "packages" folder, a new "acc_sources" folder will be created as well (this contains the zip files of the ACC packages which were extracted before)
 6. Optional - Delete downloaded zip files in "acc_sources" directory to reduce installer size (Not necessary because omitting the folder if the whole installation is packed is valid and if kept, used for other products)
-~~7. Rename and replace icons in \resources\content\images (from icons folder \*prefix*96x96.png to appicon.png \*prefix*122x192.png to appicon2x.png)~~ - not necessary anymore, those files are OK.
-8. Run Set-up.exe to install the product.
-**9. Make sure AdobePIM.dll file version in "resources" folder matches the Set-Up.exe file version.**
+7. Run Set-up.exe to install the product.
+8. Make sure AdobePIM.dll file version in "resources" folder matches the Set-Up.exe file version.
 
 ~~## Install with CCMaker~~
 ~~You can also install with ccmaker.exe (tested with v-1.3.16.0). *Crack won't work*.~~
