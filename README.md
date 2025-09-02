@@ -11,14 +11,14 @@ python ccdl-win.py -u 6 -l All -x
 python ccdl-win.py -u 6 -l en_US -p win64 -x
 ```
 
-## Installer for standalone product (I don't know for what purpose this??)
+~~## Installer for standalone product (I don't know for what purpose this??)~~
 
-1. Get old working installer
-2. Replace all files and folder in \products
-3. Rename \products\\*prefix*-Driver.xml to Driver.xml
-4. Check dependency packages are in \products folder (dependencies can be found in Driver.xml)
-5. Rename and replace icons in \resources\content\images (96x96.png to appicon.png 122x192.png to appicon2x.png)
-6. Run Set-up.exe
+~~1. Get old working installer~~
+~~2. Replace all files and folder in \products~~
+~~3. Rename \products\\*prefix*-Driver.xml to Driver.xml~~
+~~4. Check dependency packages are in \products folder (dependencies can be found in Driver.xml)~~
+~~5. Rename and replace icons in \resources\content\images (96x96.png to appicon.png 122x192.png to appicon2x.png)~~
+~~6. Run Set-up.exe~~
 
 ## Create manually
 
@@ -30,8 +30,3 @@ python ccdl-win.py -u 6 -l en_US -p win64 -x
 6. Optional - Delete downloaded zip files in "acc_sources" directory to reduce installer size (Not necessary because omitting the folder if the whole installation is packed is valid and if kept, used for other products)
 7. Run Set-up.exe to install the product.
 8. Note - Make sure AdobePIM.dll file version in "resources" folder matches the Set-Up.exe file version.
-
-~~## Install with CCMaker~~
-~~You can also install with ccmaker.exe (tested with v-1.3.16.0). *Crack won't work*.~~
-~~1. Rename desired \products\\*prefix*-Driver.xml to Driver.xml~~
-~~2. Run CCMaker and select Driver.xml.~~
