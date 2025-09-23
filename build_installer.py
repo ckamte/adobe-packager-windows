@@ -59,18 +59,23 @@ session = requests.sessions.Session()
 
 
 def setup_version():
-    jsonFromPowerShell = subprocess.run(
-        [
-            "powershell.exe",
-            "(Get-Item '"
-            + ADOBE_SETUP_BIN
-            + "').VersionInfo.FileVersion | ConvertTo-Json",
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        shell=True,
-    ).stdout
-    return json.loads(jsonFromPowerShell)
+    try:
+        jsonFromPowerShell = json.loads(subprocess.run(
+            [
+                "powershell.exe",
+                "(Get-Item '"
+                + ADOBE_SETUP_BIN
+                + "').VersionInfo.FileVersion | ConvertTo-Json",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            shell=True,
+        ).stdout)
+        return jsonFromPowerShell
+    except Exception as e:
+        sys.stderr.write("Set-up.exe not found! Please extract Set-up.exe from one of the archives, and place it in this directory.")
+        sys.exit(1)
+
 
 
 def os_data():
