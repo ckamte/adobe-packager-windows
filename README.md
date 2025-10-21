@@ -11,15 +11,6 @@ python ccdl-win.py -u 6 -l All -x
 python ccdl-win.py -u 6 -l en_US -p win64 -x
 ```
 
-~~## Installer for standalone product (I don't know for what purpose this??)~~
-
-~~1. Get old working installer~~
-~~2. Replace all files and folder in \products~~
-~~3. Rename \products\\*prefix*-Driver.xml to Driver.xml~~
-~~4. Check dependency packages are in \products folder (dependencies can be found in Driver.xml)~~
-~~5. Rename and replace icons in \resources\content\images (96x96.png to appicon.png 122x192.png to appicon2x.png)~~
-~~6. Run Set-up.exe~~
-
 ## Create manually
 
 1. Extract the whole branch to a working folder and pick one Set-up.exe version and extract it to the same folder. (v4 setup not support win10)
