@@ -6,12 +6,27 @@
 ## Usage
 
 ```
+Examples with arguments (optional):
 python ccdl-win.py -h
 python ccdl-win.py -u 6 -l All -x
 python ccdl-win.py -u 6 -l en_US -p win64 -x
+
+Arguments:
+"-l", "--installLanguage", "Language code (eg. en_US)"
+"-o", "--osLanguage", "OS Language code (eg. en_US)"
+"-p", "--appPlatform", "Application platform (eg. win64)"
+"-s", "--sapCode", "SAP code for desired product (eg. PHSP)"
+"-v", "--version", "Version of desired product (eg. 21.0.3)"
+"-d", "--destination", "Directory to download installation files to"
+"-u", "--urlVersion", "Get app info from v4/v5/v6 url (eg. v6)"
+"-A", "--Auth", "Add a bearer_token to to authenticate your account, e.g. downloading Xd"
+"-n", "--noRepeatPrompt", "Don't prompt for additional downloads"
+"-i", "--productIcons", "Get app icons"
+"-x", "--skipExisting", "Skip existing files, e.g. resuming failed downloads"
+
 ```
 
-## Create manually
+## Creation
 
 1. Extract the whole branch to a working folder and pick one Set-up.exe version and extract it to the same folder. (v4 setup not support win10)
 2. Download desire product using ccdl-win.py (creates "products" folder inside the working folder)
