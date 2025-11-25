@@ -39,7 +39,7 @@ Arguments:
 
 ## Note
 
-1. You can manually download CC Library packge using *libs* sapcode and *kfnt* for Adobe fonts.
+1. You can manually download CC Library package using *libs* sapcode and *kfnt* for Adobe fonts.
 2. Batch download is available now.
 ```
 python ccdl-win.py -u 6 -l en_US -p win64 -s phsp,idsn,ilst -x
