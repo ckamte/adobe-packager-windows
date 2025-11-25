@@ -160,37 +160,18 @@ def app_platform():
 
     return appPlatform
 
+def select_product(products, sapCodes):
+    for s, d in sapCodes.items():
+        print("[{}]{}{}".format(s, (10 - len(s)) * " ", d))
 
-def product_code(sapCodes):
-    selectedCode = args.sapCode
-    if selectedCode:
-        selectedCode = selectedCode.upper()
-
-    if selectedCode and selectedCode not in sapCodes:
-        print("\nProvided SAP code ({}) is not available\n".format(selectedCode))
-        answer = None
-        while answer is None:
-            answer = input("Are you want to continue? (y/n): ")
-            if answer.lower() in ["y", "yes"]:
-                print("")
-                selectedCode = None
-            elif answer.lower() in ["n", "no"]:
-                print("\nProgram terminated!\n")
-                exit()
-            else:
-                print("\nPlease enter yes or no!")
-                answer = None
-
-    if not selectedCode or selectedCode is None:
-        for s, d in sapCodes.items():
-            print("[{}]{}{}".format(s, (10 - len(s)) * " ", d))
-
-        while selectedCode is None:
+    slectedProduct = None
+    
+    while slectedProduct is None:
             val = input(
                 "\nPlease enter the SAP Code of the desired product from the list above: "
             ).upper()
             if products.get(val):
-                selectedCode = val
+                slectedProduct = val
             elif val == "":
                 print("No product selected! Please use a value from the list above.")
             else:
@@ -199,8 +180,46 @@ def product_code(sapCodes):
                         val
                     )
                 )
-    return selectedCode
+    return slectedProduct
 
+# for batch download
+def product_code(products, sapCodes):
+    codeList = []
+    toDown = args.sapCode
+    if toDown:
+        toDown = toDown.upper().split(',')
+        for prodToDown in toDown:
+            if prodToDown in sapCodes:
+                print("\nAdd {} to download list".format(prodToDown))
+                codeList.append(prodToDown)
+            
+            else:
+                print("\n{} is not available!\n".format(prodToDown))
+                answer = None
+                while answer is None:
+                    answer = input("Are you want to continue? (y/n): ")
+                    if answer.lower() in ["y", "yes"]:
+                        answer = select_product(products, sapCodes)
+                        # for duplicate entry
+                        while answer in codeList:
+                            print("\nAdd {} already exist in donload list".format(answer))
+                            answer = input(
+                                "\nPlease enter the SAP Code of the desired product from the list above: "
+                            ).upper()
+                        else:
+                            print("\nAdd {} to download list".format(answer))
+                            codeList.append(answer)
+                    elif answer.lower() in ["n", "no"]:
+                        print("\nProgram terminated!\n")
+                    else:
+                        print("\nPlease enter yes or no!")
+                        answer = None
+
+    else:
+        toDown = select_product(products, sapCodes)
+        codeList.append(toDown)
+
+    return codeList
 
 def product_version(product, versions):
     version = None
@@ -344,7 +363,7 @@ def parse_products_xml(products_url, url_version, allowed_platform, selected_pla
 
     #with open("ffc.xml", "wb+") as f:
     #    f.write(response.content)
-    # products_xml = ET.parse("ffc.xml")
+    #products_xml = ET.parse("ffc.xml")
 
     cdn = products_xml.find(".//*/cdn/secure").text
     allProducts = {}
@@ -898,78 +917,80 @@ def package_download(json, pkg_dir, language, selectedPlatform):
 def run_ccdl(products, cdn, sapCodes, selectedPlatform):
     """Run Main execution."""
     # get product list
-    sapCode = product_code(sapCodes)
-    product = products.get(sapCode)
+    productLists = product_code(products, sapCodes)
 
-    # version select
-    versions = product["versions"]
-    selectedVersion = product_version(product, versions)
+    for sapCode in productLists:
+        product = products.get(sapCode)
 
-    # product to download
-    prodInfo = versions[selectedVersion]
+        # version select
+        versions = product["versions"]
+        selectedVersion = product_version(product, versions)
 
-    # language select
-    supportedLangs = prodInfo["supportedLanguages"]
-    installLanguage = install_language(supportedLangs)
+        # product to download
+        prodInfo = versions[selectedVersion]
 
-    # download by manifest url
-    if sapCode == "APRO":
-        download_acrobat(prodInfo, cdn)
-        return
+        # language select
+        supportedLangs = prodInfo["supportedLanguages"]
+        installLanguage = install_language(supportedLangs)
 
-    # main product
-    print(
-        "\nPrepare to download Adobe {}-{}-{}-{}".format(
-            prodInfo["displayName"],
-            prodInfo["productVersion"],
-            installLanguage,
-            prodInfo["appPlatform"],
-        )
-    )
+        # download by manifest url
+        if sapCode == "APRO":
+            download_acrobat(prodInfo, cdn)
+            return
 
-    dest = get_download_path()
-
-    # download icons
-    if args.productIcons:
-        icons_download(prodInfo, dest)
-
-    # create products directory
-    products_dir = os.path.join(dest, "products")
-    os.makedirs(products_dir, exist_ok=True)
-
-    # create product packages dir
-    package_dir = os.path.join(products_dir, sapCode)
-    os.makedirs(package_dir, exist_ok=True)
-
-    app_json = get_application_json(prodInfo["buildGuid"])
-
-    # filter out unused languages from Application.json file
-    if installLanguage.lower() != "all":
-        app_json = language_filter(app_json, installLanguage)
-
-    print("\nDownloading main app package")
-    if (
-        package_download(app_json, package_dir, installLanguage, selectedPlatform)
-        is False
-    ):
-        print("\nCannot download all packages")
-
-    if "Dependencies" in app_json:
-        print("\nDownloading dependency packages")
-        dependencies_download(
-            app_json, products, products_dir, installLanguage, selectedPlatform
+        # main product
+        print(
+            "\nPrepare to download Adobe {}-{}-{}-{}".format(
+                prodInfo["displayName"],
+                prodInfo["productVersion"],
+                installLanguage,
+                prodInfo["appPlatform"],
+            )
         )
 
-    print("Generating Driver.xml")
-    prefix = app_json["SAPCode"] + "-"
-    write_driver_xml(app_json, products_dir, prefix)
+        dest = get_download_path()
 
-    print(
-        "\nSuccessfully downloaded Adobe {} v-{}".format(
-            prodInfo["displayName"],
-            prodInfo["productVersion"],
+        # download icons
+        if args.productIcons:
+            icons_download(prodInfo, dest)
+
+        # create products directory
+        products_dir = os.path.join(dest, "products")
+        os.makedirs(products_dir, exist_ok=True)
+
+        # create product packages dir
+        package_dir = os.path.join(products_dir, sapCode)
+        os.makedirs(package_dir, exist_ok=True)
+
+        app_json = get_application_json(prodInfo["buildGuid"])
+
+        # filter out unused languages from Application.json file
+        if installLanguage.lower() != "all":
+            app_json = language_filter(app_json, installLanguage)
+
+        print("\nDownloading main app package")
+        if (
+            package_download(app_json, package_dir, installLanguage, selectedPlatform)
+            is False
+        ):
+            print("\nCannot download all packages")
+
+        if "Dependencies" in app_json:
+            print("\nDownloading dependency packages")
+            dependencies_download(
+                app_json, products, products_dir, installLanguage, selectedPlatform
+            )
+
+        print("Generating Driver.xml")
+        prefix = app_json["SAPCode"] + "-"
+        write_driver_xml(app_json, products_dir, prefix)
+
+        print(
+            "\nSuccessfully downloaded Adobe {} v-{}".format(
+                prodInfo["displayName"],
+                prodInfo["productVersion"],
+            )
         )
-    )
 
     return
 
@@ -990,7 +1011,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-s",
         "--sapCode",
-        help="SAP code for desired product (eg. PHSP)",
+        help="SAP code for desired product (eg. PHSP). For batch download use comma to separate products",
         action="store",
     )
     parser.add_argument(
@@ -1042,6 +1063,8 @@ if __name__ == "__main__":
     while True:
         try:
             run_ccdl(products, cdn, sapCodes, selectedPlatform)
+            # cleanup old sapcodes
+            args.sapCode = None
             if args.noRepeatPrompt or not questiony(
                 "\n\nDo you want to download another package"
             ):

@@ -15,7 +15,7 @@ Arguments:
 "-l", "--installLanguage", "Language code (eg. en_US)"
 "-o", "--osLanguage", "OS Language code (eg. en_US)"
 "-p", "--appPlatform", "Application platform (eg. win64)"
-"-s", "--sapCode", "SAP code for desired product (eg. PHSP)"
+"-s", "--sapCode", "SAP code for desired product (eg. PHSP). For batch download use comma to separate products"
 "-v", "--version", "Version of desired product (eg. 21.0.3)"
 "-d", "--destination", "Directory to download installation files to"
 "-u", "--urlVersion", "Get app info from v4/v5/v6 url (eg. v6)"
@@ -36,3 +36,11 @@ Arguments:
 6. Optional - Delete downloaded zip files in "acc_sources" directory to reduce installer size (Not necessary because omitting the folder if the whole installation is packed is valid and if kept, used for other products)
 7. Run Set-up.exe to install the product.
 8. Note - Make sure AdobePIM.dll file version in "resources" folder matches the Set-Up.exe file version.
+
+## Note
+
+1. You can manually download CC Library packge using *libs* sapcode and *kfnt* for Adobe fonts.
+2. Batch download is available now.
+```
+python ccdl-win.py -u 6 -l en_US -p win64 -s phsp,idsn,ilst -x
+```
