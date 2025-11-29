@@ -48,7 +48,8 @@ ADOBE_REQ_HEADERS = {
     "User-Agent": "Adobe Application Manager 2.0",
     "X-Api-Key": "CC_HD_ESD_1_0",
     "Cookie": "fg="
-    + "".join(random.choice(string.ascii_uppercase + string.digits) for _ in range(26))
+    + "".join(random.choice(string.ascii_uppercase + string.digits)
+              for _ in range(26))
     + "======",
 }
 
@@ -62,7 +63,8 @@ def show_version():
     print("=================================")
     print("=  Adobe CC Package Downloader  =")
     print(
-        "{} {} {}\n".format("=" * ye, VERSION_STR, "=" * (31 - len(VERSION_STR) - ye))
+        "{} {} {}\n".format("=" * ye, VERSION_STR, "=" *
+                            (31 - len(VERSION_STR) - ye))
     )
 
 
@@ -160,29 +162,32 @@ def app_platform():
 
     return appPlatform
 
+
 def select_product(products, sapCodes):
     for s, d in sapCodes.items():
         print("[{}]{}{}".format(s, (10 - len(s)) * " ", d))
 
     slectedProduct = None
-    
+
     while slectedProduct is None:
-            val = input(
-                "\nPlease enter the SAP Code of the desired product from the list above: "
-            ).upper()
-            if products.get(val):
-                slectedProduct = val
-            elif val == "":
-                print("No product selected! Please use a value from the list above.")
-            else:
-                print(
-                    "{} is not available! Please use a value from the list above.".format(
-                        val
-                    )
+        val = input(
+            "\nPlease enter the SAP Code of the desired product from the list above: "
+        ).upper()
+        if products.get(val):
+            slectedProduct = val
+        elif val == "":
+            print("No product selected! Please use a value from the list above.")
+        else:
+            print(
+                "{} is not available! Please use a value from the list above.".format(
+                    val
                 )
+            )
     return slectedProduct
 
 # for batch download
+
+
 def product_code(products, sapCodes):
     codeList = []
     toDown = args.sapCode
@@ -192,7 +197,7 @@ def product_code(products, sapCodes):
             if prodToDown in sapCodes:
                 print("\nAdd {} to download list".format(prodToDown))
                 codeList.append(prodToDown)
-            
+
             else:
                 print("\n{} is not available!\n".format(prodToDown))
                 answer = None
@@ -202,7 +207,8 @@ def product_code(products, sapCodes):
                         answer = select_product(products, sapCodes)
                         # for duplicate entry
                         while answer in codeList:
-                            print("\nAdd {} already exist in donload list".format(answer))
+                            print(
+                                "\nAdd {} already exist in donload list".format(answer))
                             answer = input(
                                 "\nPlease enter the SAP Code of the desired product from the list above: "
                             ).upper()
@@ -220,6 +226,7 @@ def product_code(products, sapCodes):
         codeList.append(toDown)
 
     return codeList
+
 
 def product_version(product, versions):
     version = None
@@ -357,13 +364,14 @@ def product_languages(elem):
 def parse_products_xml(products_url, url_version, allowed_platform, selected_platform):
     # get xml data
     print("Downloading product data\n")
-    response = session.get(products_url, stream=True, headers=ADOBE_REQ_HEADERS)
+    response = session.get(products_url, stream=True,
+                           headers=ADOBE_REQ_HEADERS)
     response.encoding = "utf-8"
     products_xml = ET.fromstring(response.content)
 
-    #with open("ffc.xml", "wb+") as f:
+    # with open("ffc.xml", "wb+") as f:
     #    f.write(response.content)
-    #products_xml = ET.parse("ffc.xml")
+    # products_xml = ET.parse("ffc.xml")
 
     cdn = products_xml.find(".//*/cdn/secure").text
     allProducts = {}
@@ -421,8 +429,9 @@ def parse_products_xml(products_url, url_version, allowed_platform, selected_pla
                                 "buildGuid": languageSet.get("buildGuid"),
                                 "manifestURL": manifestURL,
                             }
-                            if args.productIcons: 
-                                allProducts[sapCode]["versions"][productVersion]['productIcons'] = product_icons(product)
+                            if args.productIcons:
+                                allProducts[sapCode]["versions"][productVersion]['productIcons'] = product_icons(
+                                    product)
                         else:
                             if url_version >= 5:
                                 allProducts.pop(sapCode, None)
@@ -484,9 +493,7 @@ def download_progress(url, dest_dir, prefix=""):
     response = session.head(url, stream=False, headers=ADOBE_DL_HEADERS)
     total_size_in_bytes = int(response.headers.get("content-length", 0))
 
-    # download file
-    response = session.get(url, stream=True, headers=ADOBE_REQ_HEADERS)
-
+    # skip existing files
     filename = os.path.basename(url)
     if prefix:
         filename = prefix + filename
@@ -500,6 +507,9 @@ def download_progress(url, dest_dir, prefix=""):
     ):
         print("Downloaded file is OK, skipping ... \n")
         return True
+
+    # download file
+    response = session.get(url, stream=True, headers=ADOBE_REQ_HEADERS)
 
     block_size = 1024  # 1 Kibibyte
     progress_bar = tqdm(total=total_size_in_bytes, unit="iB", unit_scale=True)
@@ -745,18 +755,21 @@ def condition_filter(package, language, ProcessorFamily):
     if "&&" in conditionString:
         conditions = conditionString.split("&&")
         for condition in conditions:
-            testResult = condition_test(package, language, ProcessorFamily, condition)
+            testResult = condition_test(
+                package, language, ProcessorFamily, condition)
             if testResult is False:
                 break
 
     elif "||" in conditionString:
         conditions = conditionString.split("||")
         for condition in conditions:
-            testResult = condition_test(package, language, ProcessorFamily, condition)
+            testResult = condition_test(
+                package, language, ProcessorFamily, condition)
             if testResult is True:
                 break
     else:
-        testResult = condition_test(package, language, ProcessorFamily, conditionString)
+        testResult = condition_test(
+            package, language, ProcessorFamily, conditionString)
 
     return testResult
 
@@ -869,7 +882,8 @@ def dependencies_download(json, products, pds_dir, installLanguage, selectedPlat
         firstItem = dep_data[0]
         dep_json = get_application_json(firstItem["buildGuid"])
         if (
-            package_download(dep_json, dep_dir, installLanguage, selectedPlatform)
+            package_download(dep_json, dep_dir,
+                             installLanguage, selectedPlatform)
             is False
         ):
             print("\nCannot download dependency package")
@@ -936,7 +950,7 @@ def run_ccdl(products, cdn, sapCodes, selectedPlatform):
         # download by manifest url
         if sapCode == "APRO":
             download_acrobat(prodInfo, cdn)
-            return
+            continue
 
         # main product
         print(
@@ -970,7 +984,8 @@ def run_ccdl(products, cdn, sapCodes, selectedPlatform):
 
         print("\nDownloading main app package")
         if (
-            package_download(app_json, package_dir, installLanguage, selectedPlatform)
+            package_download(app_json, package_dir,
+                             installLanguage, selectedPlatform)
             is False
         ):
             print("\nCannot download all packages")
