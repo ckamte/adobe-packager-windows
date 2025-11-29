@@ -37,7 +37,7 @@ except ImportError:
     )
 
 VERSION = 1
-VERSION_STR = "1.0.0"
+VERSION_STR = "1.1.0"
 CODE_QUALITY = "Really_AWFUL"
 
 ADOBE_PRODUCTS_XML_URL = "https://prod-rel-ffc-ccm.oobesaas.adobe.com/adobe-ffc-external/core/v{urlVersion}/products/all?channel=ccm&channel=sti&platform={installPlatform}&productType=Desktop&_type=xml"
