@@ -43,7 +43,7 @@ https://drive.google.com/file/d/1Quc2YgR85VO9_aTMo3HfvcsOXnlwSFid/view?usp=shari
 ## Note
 
 1. You can manually download CC Library package using *libs* sapcode and *kfnt* for Adobe fonts.
-2. Batch download is available now.
+2. Batch download is available now. (Batch download will _now_ try to download latest version of products)
 ```
 python ccdl-win.py -u 6 -l en_US -p win64 -s phsp,idsn,ilst -x
 ```

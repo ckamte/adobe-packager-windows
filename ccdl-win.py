@@ -82,20 +82,15 @@ def questiony(question: str) -> bool:
 
 def url_version():
     urlVersion = None
+    acceptVers = ["v4", "v4", "v6", "4", "5", "6"]
     if args.urlVersion:
-        if args.urlVersion.lower() == "v4" or args.urlVersion == "4":
-            urlVersion = 4
-        elif args.urlVersion.lower() == "v5" or args.urlVersion == "5":
-            urlVersion = 5
-        elif args.urlVersion.lower() == "v6" or args.urlVersion == "6":
-            urlVersion = 6
+        if args.urlVersion.lower() in acceptVers:
+            urlVersion = args.urlVersion[-1]
+            print("\nUsing provided url version: " + urlVersion)
         else:
-            print(
-                'Invalid argument "{}" for {}! Please select from version list below\n'.format(
-                    args.urlVersion, "URL version"
-                )
-            )
             urlVersion = None
+            print(
+                f'Invalid URL Version [{args.urlVersion}]! Please select from version list below\n')
 
     while not urlVersion:
         versions = {
@@ -113,14 +108,10 @@ def url_version():
             )
             or "v6"
         )
-        if val == "v4" or val == "4":
-            urlVersion = 4
-        elif val == "v5" or val == "5":
-            urlVersion = 5
-        elif val == "v6" or val == "6":
-            urlVersion = 6
+        if val in acceptVers:
+            urlVersion = val[-1]
         else:
-            print("Invalid URL version: {}\n".format(val))
+            print(f"Invalid URL version: {val}\n")
 
     return urlVersion
 
@@ -138,10 +129,7 @@ def app_platform():
             print("\nUsing provided version: " + appPlatform)
         else:
             print(
-                'Invalid argument "{}" for {}! Please select form list below\n'.format(
-                    args.appPlatform, "application platform"
-                )
-            )
+                f'Invalid application platform {args.appPlatform}! Please select form list below\n')
             appPlatform = None
 
     while not appPlatform:
@@ -158,7 +146,7 @@ def app_platform():
         if val in winPlatforms:
             appPlatform = val
         else:
-            print("Invalid platform: {}\n".format(val))
+            print(f"Invalid platform: {val}\n")
 
     return appPlatform
 
@@ -178,28 +166,23 @@ def select_product(products, sapCodes):
         elif val == "":
             print("No product selected! Please use a value from the list above.")
         else:
-            print(
-                "{} is not available! Please use a value from the list above.".format(
-                    val
-                )
-            )
+            print(f"{val} is not available! Please use a value from the list above.")
     return slectedProduct
-
-# for batch download
 
 
 def product_code(products, sapCodes):
     codeList = []
     toDown = args.sapCode
+    # for batch download
     if toDown:
         toDown = toDown.upper().split(',')
         for prodToDown in toDown:
             if prodToDown in sapCodes:
-                print("\nAdd {} to download list".format(prodToDown))
+                print(f"\nAdd {prodToDown} to download list")
                 codeList.append(prodToDown)
 
             else:
-                print("\n{} is not available!\n".format(prodToDown))
+                print(f"\n{prodToDown} is not available!\n")
                 answer = None
                 while answer is None:
                     answer = input("Are you want to continue? (y/n): ")
@@ -208,12 +191,12 @@ def product_code(products, sapCodes):
                         # for duplicate entry
                         while answer in codeList:
                             print(
-                                "\nAdd {} already exist in donload list".format(answer))
+                                f"\nAdd {answer} already exist in donload list")
                             answer = input(
                                 "\nPlease enter the SAP Code of the desired product from the list above: "
                             ).upper()
                         else:
-                            print("\nAdd {} to download list".format(answer))
+                            print(f"\nAdd {answer} to download list")
                             codeList.append(answer)
                     elif answer.lower() in ["n", "no"]:
                         print("\nProgram terminated!\n")
@@ -225,22 +208,35 @@ def product_code(products, sapCodes):
         toDown = select_product(products, sapCodes)
         codeList.append(toDown)
 
+    if len(codeList) > 1:
+        print(f"\nThe latest version of products will download")
+
     return codeList
+
+
+def get_last_version(versions):
+    last = None
+    for v in reversed(versions.values()):
+        if v["buildGuid"] is not None or v["manifestURL"] is not None:
+            last = v["productVersion"]
+        else:
+            print("\nCannot determine latest version!\n")
+    return last
 
 
 def product_version(product, versions):
     version = None
     if args.version:
         if versions.get(args.version):
-            print("\nUsing provided version: " + args.version)
+            print(f"\nUsing provided version: {args.version}")
             version = args.version
         else:
-            print("\nProvided version not found: " + args.version)
-
-    print("")
+            print(f"\nProvided version not found: {args.version}")
 
     if not version:
-        lastVersion = None
+        lastVersion = get_last_version(versions)
+
+        print("\nAvailable versions list")
         for v in reversed(versions.values()):
             if v["buildGuid"] is not None or v["manifestURL"] is not None:
                 print(
@@ -248,25 +244,18 @@ def product_version(product, versions):
                         product["displayName"], v["appPlatform"], v["productVersion"]
                     )
                 )
-                lastVersion = v["productVersion"]
 
         while version is None:
             val = (
                 input(
-                    "\nPlease enter the desired version. Nothing for "
-                    + lastVersion
-                    + ": "
-                )
+                    f"\nPlease enter the desired version. Nothing for {lastVersion}:")
                 or lastVersion
             )
             if versions.get(val):
                 version = val
             else:
                 print(
-                    "{} is not a valid version. Please use a value from the list above.".format(
-                        val
-                    )
-                )
+                    f"{val} is not a valid version. Please use a value from the list above.")
 
     print(
         "\nPrepare to download Adobe {}, version {}".format(
@@ -298,10 +287,10 @@ def install_language(supportedLangs):
     installLanguage = None
     if args.installLanguage:
         if args.installLanguage in supportedLangs:
-            print("\nUsing provided language: " + args.installLanguage)
+            print(f"\nUsing provided language: {args.installLanguage}")
             installLanguage = args.installLanguage
         else:
-            print("\nProvided language not available: " + args.installLanguage)
+            print(f"\nProvided language not available: {args.installLanguage}")
 
     if not installLanguage:
         print("\nAvailable languages: {}".format(", ".join(supportedLangs)))
@@ -320,10 +309,7 @@ def install_language(supportedLangs):
                 installLanguage = val
             else:
                 print(
-                    "{} is not available. Please use a value from the list above.".format(
-                        val
-                    )
-                )
+                    f"{val} is not available. Please use a value from the list above.")
 
     if osLang != installLanguage:
         if installLanguage != "All":
@@ -337,10 +323,7 @@ def install_language(supportedLangs):
                 )
                 if osLang not in supportedLangs:
                     print(
-                        "{} is not available. Please use a value from the list above.".format(
-                            osLang
-                        )
-                    )
+                        f"{osLang} is not available. Please use a value from the list above.")
 
     return installLanguage
 
@@ -441,10 +424,10 @@ def parse_products_xml(products_url, url_version, allowed_platform, selected_pla
 
 def get_products():
     selectedVersion = url_version()
-    print("\nUsing URL version {}\n".format(selectedVersion))
+    print(f"\nUsing URL version {selectedVersion}\n")
 
     selectedPlatform = app_platform()
-    print("\nGetting {} products\n".format(selectedPlatform))
+    print(f"\nGetting {selectedPlatform} products\n")
 
     if args.Auth:
         ADOBE_REQ_HEADERS["Authorization"] = args.Auth
@@ -467,10 +450,7 @@ def get_products():
     for p in products.values():
         if p["appType"] == "app":
             versions = p["versions"]
-            lastVersion = None
-            for v in reversed(versions.values()):
-                if v["buildGuid"] is not None or v["manifestURL"] is not None:
-                    lastVersion = v["productVersion"]
+            lastVersion = get_last_version(versions)
             if lastVersion:
                 sapCodes[p["sapCode"]] = p["displayName"]
     print(str(len(sapCodes)) + " products found:")
@@ -603,7 +583,7 @@ def download_acrobat(appInfo, cdn):
         elif val == "":
             print("No product selected! Please use a value from the list above.")
         else:
-            print("{} is not available! Please check your input.".format(val))
+            print(f"{val} is not available! Please check your input.")
 
     downloadURL = productList[val]["downloadUrl"]
 
@@ -614,7 +594,7 @@ def download_acrobat(appInfo, cdn):
     filePath = os.path.join(dest, name)
 
     if file_download(downloadURL, dest, sapCode, version, name) is True:
-        print("\n{} was successfully downloaded to: {}".format(name, filePath))
+        print(f"\n{name} was successfully downloaded to: {filePath}")
     return
 
 
@@ -841,9 +821,7 @@ def package_filter(package, language, platform):
                     noneCoreCount += 1
 
     print(
-        "\nSelected {} core packages and {} non-core packages".format(
-            coreCount, noneCoreCount
-        )
+        f"\nSelected {coreCount} core packages and {noneCoreCount} non-core packages"
     )
 
     return urlPath, newPackage
@@ -938,7 +916,10 @@ def run_ccdl(products, cdn, sapCodes, selectedPlatform):
 
         # version select
         versions = product["versions"]
-        selectedVersion = product_version(product, versions)
+        if len(productLists) > 1:
+            selectedVersion = get_last_version(versions)
+        else:
+            selectedVersion = product_version(product, versions)
 
         # product to download
         prodInfo = versions[selectedVersion]
