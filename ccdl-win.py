@@ -36,6 +36,7 @@ except ImportError:
         or run: pip3 install tqdm."""
     )
 
+SCRIPT_NAME = "Adobe CC Packages Downloader for Windows"
 VERSION = 1
 VERSION_STR = "1.1.0"
 CODE_QUALITY = "Really_AWFUL"
@@ -58,14 +59,74 @@ ADOBE_DL_HEADERS = {"User-Agent": "Creative Cloud"}
 session = requests.sessions.Session()
 
 
-def show_version():
-    ye = int((32 - len(VERSION_STR)) / 2)
-    print("=================================")
-    print("=  Adobe CC Package Downloader  =")
-    print(
-        "{} {} {}\n".format("=" * ye, VERSION_STR, "=" *
-                            (31 - len(VERSION_STR) - ye))
+def show_version(name, version, p=4, c="=") -> None:
+    """Show script title"""
+    tl = len(name) + (p * 2)
+    print(c * tl)
+    print(c + name.center(tl - 2) + c)
+    print(f"{version.center(tl, c)}\n")
+    
+
+def get_arguments():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-l", "--installLanguage", help="Language code (eg. en_US)", action="store"
     )
+    parser.add_argument(
+        "-o", "--osLanguage", help="OS Language code (eg. en_US)", action="store"
+    )
+    parser.add_argument(
+        "-p", "--appPlatform", help="Application platform (eg. win64)", action="store"
+    )
+    parser.add_argument(
+        "-s",
+        "--sapCode",
+        help="SAP code for desired product (eg. PHSP). For batch download use comma to separate products",
+        action="store",
+    )
+    parser.add_argument(
+        "-v",
+        "--version",
+        help="Version of desired product (eg. 21.0.3)",
+        action="store",
+    )
+    parser.add_argument(
+        "-d",
+        "--destination",
+        help="Directory to download installation files to",
+        action="store",
+    )
+    parser.add_argument(
+        "-u",
+        "--urlVersion",
+        help="Get app info from v4/v5/v6 url (eg. v6)",
+        action="store",
+    )
+    parser.add_argument(
+        "-A",
+        "--Auth",
+        help="Add a bearer_token to to authenticate your account, e.g. downloading Xd",
+        action="store",
+    )
+    parser.add_argument(
+        "-n",
+        "--noRepeatPrompt",
+        help="Don't prompt for additional downloads",
+        action="store_true",
+    )
+    parser.add_argument(
+        "-i",
+        "--productIcons",
+        help="Get app icons",
+        action="store_true",
+    )
+    parser.add_argument(
+        "-x",
+        "--skipExisting",
+        help="Skip existing files, e.g. resuming failed downloads",
+        action="store_true",
+    )
+    return parser.parse_args()
 
 
 def get_install_dir():
@@ -86,7 +147,7 @@ def url_version():
     if args.urlVersion:
         if args.urlVersion.lower() in acceptVers:
             urlVersion = args.urlVersion[-1]
-            print("\nUsing provided url version: " + urlVersion)
+            print(f"\nUsing provided url version: {urlVersion}")
         else:
             urlVersion = None
             print(
@@ -126,7 +187,7 @@ def app_platform():
     if args.appPlatform:
         if args.appPlatform in winPlatforms:
             appPlatform = args.appPlatform
-            print("\nUsing provided version: " + appPlatform)
+            print(f"\nUsing provided version {appPlatform}: ")
         else:
             print(
                 f'Invalid application platform {args.appPlatform}! Please select form list below\n')
@@ -453,7 +514,7 @@ def get_products():
             lastVersion = get_last_version(versions)
             if lastVersion:
                 sapCodes[p["sapCode"]] = p["displayName"]
-    print(str(len(sapCodes)) + " products found:")
+    print(f"{str(len(sapCodes))} products found:")
 
     return products, cdn, sapCodes, selectedPlatform
 
@@ -461,7 +522,7 @@ def get_products():
 def get_download_path():
     """Ask for desired download folder"""
     if args.destination:
-        print("\nUsing provided destination: " + args.destination + "\n")
+        print(f"\nUsing provided destination: {args.destination}\n")
         dest = args.destination
     else:
         dest = os.path.dirname(os.path.realpath(__name__))
@@ -528,7 +589,7 @@ def file_download(url, dest_dir, s, v, name=None):
     return download_progress(url, dest_dir)
 
 
-def download_acrobat(appInfo, cdn):
+def download_acrobat(appInfo, cdn, downList):
     # download manifest file
     response = session.get(
         cdn + appInfo["manifestURL"], stream=True, headers=ADOBE_REQ_HEADERS
@@ -540,12 +601,15 @@ def download_acrobat(appInfo, cdn):
     assetList = manifest.findall("./asset_list/asset")
     productList = {}
     prodNum = 0
+    full = None
     for asset in assetList:
         prodNum += 1
         assetPath = asset.find("./asset_path").text
         baseVersion = asset.find(".//baseVersion")
         if baseVersion is not None:
             baseVersion = baseVersion.text
+        else:
+            full = str(prodNum)
 
         productList[str(prodNum)] = {
             "assetName": os.path.basename(assetPath),
@@ -555,6 +619,9 @@ def download_acrobat(appInfo, cdn):
         }
 
     selectedCode = None
+    if len(downList) > 1:
+        selectedCode = full
+
     while selectedCode is None:
         print("\nAvailable downloads\n")
         for n, p in productList.items():
@@ -575,8 +642,8 @@ def download_acrobat(appInfo, cdn):
                 )
 
         val = input(
-            "\nPlease enter the number of the desired product from the list above: "
-        )
+            "\nPlease enter the number from list above or blank to download full installer: "
+        ) or full
 
         if val in productList:
             selectedCode = val
@@ -585,7 +652,7 @@ def download_acrobat(appInfo, cdn):
         else:
             print(f"{val} is not available! Please check your input.")
 
-    downloadURL = productList[val]["downloadUrl"]
+    downloadURL = productList[selectedCode]["downloadUrl"]
 
     dest = get_download_path()
     sapCode = appInfo["sapCode"]
@@ -930,7 +997,7 @@ def run_ccdl(products, cdn, sapCodes, selectedPlatform):
 
         # download by manifest url
         if sapCode == "APRO":
-            download_acrobat(prodInfo, cdn)
+            download_acrobat(prodInfo, cdn, productLists)
             continue
 
         # main product
@@ -992,67 +1059,9 @@ def run_ccdl(products, cdn, sapCodes, selectedPlatform):
 
 
 if __name__ == "__main__":
-    show_version()
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-l", "--installLanguage", help="Language code (eg. en_US)", action="store"
-    )
-    parser.add_argument(
-        "-o", "--osLanguage", help="OS Language code (eg. en_US)", action="store"
-    )
-    parser.add_argument(
-        "-p", "--appPlatform", help="Application platform (eg. win64)", action="store"
-    )
-    parser.add_argument(
-        "-s",
-        "--sapCode",
-        help="SAP code for desired product (eg. PHSP). For batch download use comma to separate products",
-        action="store",
-    )
-    parser.add_argument(
-        "-v",
-        "--version",
-        help="Version of desired product (eg. 21.0.3)",
-        action="store",
-    )
-    parser.add_argument(
-        "-d",
-        "--destination",
-        help="Directory to download installation files to",
-        action="store",
-    )
-    parser.add_argument(
-        "-u",
-        "--urlVersion",
-        help="Get app info from v4/v5/v6 url (eg. v6)",
-        action="store",
-    )
-    parser.add_argument(
-        "-A",
-        "--Auth",
-        help="Add a bearer_token to to authenticate your account, e.g. downloading Xd",
-        action="store",
-    )
-    parser.add_argument(
-        "-n",
-        "--noRepeatPrompt",
-        help="Don't prompt for additional downloads",
-        action="store_true",
-    )
-    parser.add_argument(
-        "-i",
-        "--productIcons",
-        help="Get app icons",
-        action="store_true",
-    )
-    parser.add_argument(
-        "-x",
-        "--skipExisting",
-        help="Skip existing files, e.g. resuming failed downloads",
-        action="store_true",
-    )
-    args = parser.parse_args()
+    show_version(SCRIPT_NAME, VERSION_STR)
+    
+    args = get_arguments()
 
     products, cdn, sapCodes, selectedPlatform = get_products()
 
