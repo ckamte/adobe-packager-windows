@@ -1,0 +1,78 @@
+<ProductInfo>
+	<Name>Adobe Acrobat Pro DC</Name>
+	<InstallerType>ThirdParty</InstallerType>
+	<HideProductLaunch>true</HideProductLaunch>
+	<Icons>
+		<Size20x19>
+			<path>./resources/icons/apro20x19.png</path>
+		</Size20x19>
+		<Size32x32>
+			<path>./resources/icons/apro32x32.png</path>
+		</Size32x32>
+		<Size44x42>
+			<path>./resources/icons/apro44x42.png</path>
+		</Size44x42>
+		<Size64x64>
+			<path>./resources/icons/apro64x64.png</path>
+		</Size64x64>
+		<Size88x84>
+			<path>./resources/icons/apro88x84.png</path>
+		</Size88x84>
+		<Size176x168>
+			<path>./resources/icons/apro176x168.png</path>
+		</Size176x168>
+	</Icons>
+	<ConflictingProcesses>
+		<ConflictingProcess>
+			<RegularExpression>^[Aa][Cc][Rr][Oo][Bb][Aa][Tt].[Ee][Xx][Ee]$</RegularExpression>
+			<ProcessDisplayName>Adobe Acrobat</ProcessDisplayName>
+		</ConflictingProcess>
+		<ConflictingProcess>
+			<RegularExpression>^[Aa][Cc][Aa][Dd].[Ee][Xx][Ee]$</RegularExpression>
+			<ProcessDisplayName>AutoCAD Application</ProcessDisplayName>
+		</ConflictingProcess>
+		<ConflictingProcess>
+			<RegularExpression>^[Ee][Xx][Cc][Ee][Ll]\.[Ee][Xx][Ee]$</RegularExpression>
+			<ProcessDisplayName>Microsoft Excel</ProcessDisplayName>
+		</ConflictingProcess>
+		<ConflictingProcess>
+			<RegularExpression>^[Oo][Uu][Tt][Ll][Oo][Oo][Kk]\.[Ee][Xx][Ee]$</RegularExpression>
+			<ProcessDisplayName>Microsoft Outlook</ProcessDisplayName>
+		</ConflictingProcess>
+		<ConflictingProcess>
+			<RegularExpression>^[Pp][Oo][Ww][Ee][Rr][Pp][Nn][Tt]\.[Ee][Xx][Ee]$</RegularExpression>
+			<ProcessDisplayName>Microsoft PowerPoint</ProcessDisplayName>
+		</ConflictingProcess>
+		<ConflictingProcess>
+			<RegularExpression>^[Vv][Ii][Ss][Ii][Oo]\.[Ee][Xx][Ee]$</RegularExpression>
+			<ProcessDisplayName>Microsoft Visio</ProcessDisplayName>
+		</ConflictingProcess>
+		<ConflictingProcess>
+			<RegularExpression>^[Vv][Ii][Ss][Ii][Oo]32\.[Ee][Xx][Ee]$</RegularExpression>
+			<ProcessDisplayName>Microsoft Visio</ProcessDisplayName>
+		</ConflictingProcess>
+		<ConflictingProcess>
+			<RegularExpression>^[Ww][Ii][Nn][Ww][Oo][Rr][Dd]\.[Ee][Xx][Ee]$</RegularExpression>
+			<ProcessDisplayName>Microsoft Word</ProcessDisplayName>
+		</ConflictingProcess>
+	</ConflictingProcesses>
+	<InstallData>
+		<ThirdPartyData>
+			<CodexVersion>22.3</CodexVersion>
+			<Platform>win64</Platform>
+			<EsdDirectory>./products/APRO</EsdDirectory>
+			<InstallSize>1636827136</InstallSize>
+			<DefaultInstallDir>[AdobeProgramFiles]</DefaultInstallDir>
+			<InstallCommand>
+				<Path>Setup.exe</Path>
+				<Arguments>
+					<Argument>/sAll</Argument>
+					<Argument>/msi INSTALLDIR="[InstallDir]\Acrobat DC" LANG_LIST=[InstallLanguage] EULA_ACCEPT=YES SUITEMODE=1 OWNERSHIP_STATE=1 IGNOREAAM=1</Argument>
+				</Arguments>
+				<SuccessExitCodes>
+					<ExitCode>0</ExitCode>
+				</SuccessExitCodes>
+			</InstallCommand>
+		</ThirdPartyData>
+	</InstallData>
+</ProductInfo>
