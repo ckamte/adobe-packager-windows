@@ -1,8 +1,10 @@
 ## Folder structure:
+```
 .\packages
 .\products
 .\resources
 .\Set-up.exe
+```
 
 # How to
 1. Download desired products.
