@@ -48,3 +48,7 @@ https://drive.google.com/file/d/1Quc2YgR85VO9_aTMo3HfvcsOXnlwSFid/view?usp=shari
 python ccdl-win.py -u 6 -l en_US -p win64 -s phsp,idsn,ilst -x
 ```
 3. You can create suite like installer by using gen-suite.py (from suite_installer directory)
+4. You can now add two or more languages to download.
+```
+python ccdl-win.py -u 6 -l en_US,fr_FR -p win64 -s phsp,idsn,ilst -x
+```
