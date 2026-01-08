@@ -645,11 +645,16 @@ def install_language(appLangs: list[str]) -> list[str]:
                 installLanguage.append(l)
             else:
                 print(f"\nProvided language not available: {l}")
+                if len(appLangs) == 1:
+                    print(f"\nSet language to available language {appLangs[0]}")
+                    installLanguage = appLangs
+                    break
+
                 if questiony("\nDo you want to select another language?"):
                     newLang = select_language(appLangs, defLang)
                     # all (mul) means all languages
                     if newLang == "mul" or newLang == "all":
-                        installLanguage = ["mul"]
+                        installLanguage = ["all"]
                         break
 
                     while newLang in installLanguage:

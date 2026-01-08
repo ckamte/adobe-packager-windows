@@ -138,6 +138,10 @@ def gen_suiteinfo():
     langs = add_product(products)
 
     for sl in langs:
+        # remove mul from locale list
+        if sl == "mul":
+            continue
+
         tmp = ET.SubElement(supLangs, "Locale")
         tmp.text = sl
     
