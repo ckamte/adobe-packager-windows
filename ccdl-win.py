@@ -148,7 +148,7 @@ def get_winver() -> str:
 def set_url_version(args: argparse.Namespace) -> str:
     """Set url version for downloading ffc.xml"""
     urlVersion = None
-    acceptVers = ["v4", "v4", "v6", "4", "5", "6"]
+    acceptVers = ["v4", "v5", "v6", "4", "5", "6"]
 
     if args.urlVersion:
         if args.urlVersion.lower() in acceptVers:

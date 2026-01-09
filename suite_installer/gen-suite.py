@@ -163,11 +163,25 @@ if __name__ == "__main__":
     parser.add_argument(
         "-d", "--prodsDir", help="Products directory", action="store"
     )
+    parser.add_argument(
+        "-n", "--suiteName", help="Name for suite", action="store"
+    )
+    parser.add_argument(
+        "-v", "--suiteVer", help="Suite version number", action="store"
+    )
     args = parser.parse_args()
 
     show_info(SCRIPT_NAME, VERSION_STR, 10, "=")
-    suiteName = (input("\nPlease enter a name for suite: ").strip() or "Adobe Creative Cloud")
-    suiteVer = (input("\nPlease enter suite version: ").strip() or "1.0")
+
+    suiteName = args.suiteName
+
+    while suiteName is None:
+        suiteName = (input("\nPlease enter a name for suite: ").strip() or "Adobe Creative Cloud")
+    
+    suiteVer = args.suiteVer
+    while suiteVer is None:
+        suiteVer = (input("\nPlease enter suite version: ").strip() or "1.0")
+    
     prodsDir = args.prodsDir or prodsDir
     print(f"\nSuiteInfo.xml file will be save in {os.path.realpath(prodsDir)}")
     
