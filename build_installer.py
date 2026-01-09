@@ -49,7 +49,7 @@ ADOBE_DL_HEADERS = {"User-Agent": "Creative Cloud"}
 
 ACC_URL = "https://ccmdls.adobe.com/AdobeProducts/StandaloneBuilds/ACCC/ESD/{mainVer}/{buildVer}/{platform}/{fileName}"
 
-CURR_PATH = os.path.dirname(os.path.abspath(__file__))
+CURR_PATH = os.path.dirname(os.path.realpath(__name__))
 
 ADOBE_SETUP_BIN = os.path.join(CURR_PATH, "Set-up.exe")
 
