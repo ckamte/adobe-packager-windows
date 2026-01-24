@@ -878,7 +878,7 @@ def condition_filter(pkgJson: dict, langs: list[str]) -> dict:
             app, pproLang = pkg["PackageName"].split("-")
             pproLang = pproLang.replace("esl_lp_", "")
             for l in langs:
-                if l == "all":
+                if l == "all" or l == "mul":
                     continue
                 main, locale = l.split("_")
                 if main == pproLang:
