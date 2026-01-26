@@ -52,3 +52,4 @@ python ccdl-win.py -u 6 -l en_US -p win64 -s phsp,idsn,ilst -x
 ```
 python ccdl-win.py -u 6 -l en_US,fr_FR -p win64 -s phsp,idsn,ilst -x
 ```
+5. Working on filtering Speech to Text Language Pack modules for AME (v26x). (Current script will download all available modules!!)

@@ -873,20 +873,21 @@ def condition_filter(pkgJson: dict, langs: list[str]) -> dict:
                 if test_and(conds, osProc, osver, langs) == True:
                     newPkgs.append(pkg)
 
-        # premiere pro
+        # premiere pro/media encoder
         elif "-esl_lp_" in pkg["PackageName"]:
-            app, pproLang = pkg["PackageName"].split("-")
-            pproLang = pproLang.replace("esl_lp_", "")
-            for l in langs:
-                if l == "all" or l == "mul":
-                    continue
-                main, locale = l.split("_")
-                if main == pproLang:
-                    newPkgs.append(pkg)
-                # for china languages
-                if main == "zh":
-                    if pproLang == "cmn" or pproLang == "yue":
+            if "all" in langs or "mul" in langs:
+                newPkgs.append(pkg)
+            else:
+                app, pproLang = pkg["PackageName"].split("-")
+                pproLang = pproLang.replace("esl_lp_", "")
+                for l in langs:
+                    main, locale = l.split("_")
+                    if main == pproLang:
                         newPkgs.append(pkg)
+                    # for china languages
+                    if main == "zh":
+                        if pproLang == "cmn" or pproLang == "yue":
+                            newPkgs.append(pkg)
 
         else:
             newPkgs.append(pkg)
