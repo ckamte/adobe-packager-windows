@@ -1022,11 +1022,14 @@ def write_driver_xml(pkgJson: dict, pkgDir: str) -> None:
             productInfo.append(child)
 
     langRoot = ET.SubElement(productInfo, "SupportedLanguages")
-    for lg in pkgJson["SupportedLanguages"]["Language"]:
-        for key, val in dict({"Language": ""}).items():
-            child = ET.Element(key)
-            child.set("locale", lg["locale"])
-            langRoot.append(child)
+
+    availLoc = pkgJson["SupportedLanguages"]["Language"]
+    if availLoc[0]["locale"] != "mul":
+        for lg in availLoc:
+            for key, val in dict({"Language": ""}).items():
+                child = ET.Element(key)
+                child.set("locale", lg["locale"])
+                langRoot.append(child)
 
     # suppress error on dep package download
     if "MinimumSupportedClientVersion" in pkgJson and "HDBuilderVersion" in pkgJson:
