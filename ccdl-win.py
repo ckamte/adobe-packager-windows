@@ -252,7 +252,8 @@ def set_config() -> dict:
     os.makedirs(prodDir, exist_ok=True)
 
     winver = get_winver()
-    print(f"\nSet windows version to {winver}. You may not install or run products on Windows version below: {winver}!")
+    print(
+        f"\nSet windows version to {winver}. You may not install or run products on Windows version below: {winver}!")
 
     print(f"\nDownloaded files will be saved in: {prodDir}")
 
@@ -426,6 +427,20 @@ def get_products(cfg: dict) -> dict:
                         ):
                             productVersion = ls.find(".//appVersion").text
 
+                        # check available languages using tutorial pages
+                        langList = product_languages(ls)
+                        if len(langList) == 1 and langList[0] == "mul":
+                            tutLangs = []
+                            for cEntries in product.findall("./custom-data/custom-entry"):
+                                eKey = cEntries.get("key")
+                                if "tutorialsPage_" in eKey:
+                                    tutLocale = eKey.split("_", 1)[1]
+                                    if tutLocale != "mul":
+                                        tutLangs.append(tutLocale)
+
+                            if tutLangs:
+                                langList = tutLangs
+
                         # get product with version
                         if productVersion is not None:
                             allProducts[sapCode]["versions"][productVersion] = {
@@ -433,7 +448,7 @@ def get_products(cfg: dict) -> dict:
                                 "displayName": displayName,
                                 "appPlatform": appPlatform,
                                 "productVersion": productVersion,
-                                "supportedLanguages": product_languages(ls),
+                                "supportedLanguages": langList,
                                 "buildGuid": languageSet.get("buildGuid"),
                                 "manifestURL": manifestURL,
                             }
@@ -646,7 +661,8 @@ def install_language(appLangs: list[str]) -> list[str]:
             else:
                 print(f"\nProvided language not available: {l}")
                 if len(appLangs) == 1:
-                    print(f"\nSet language to available language {appLangs[0]}")
+                    print(
+                        f"\nSet language to available language {appLangs[0]}")
                     installLanguage = appLangs
                     break
 
@@ -796,7 +812,7 @@ def do_test(cond: str, key: str | list[str]) -> bool:
             else:
                 c = int(c)
                 k = int(keys[idx])
-            
+
             if opt(k, c) is not True:
                 return False
 
@@ -975,7 +991,18 @@ def get_appjson(prodInfo: list) -> dict:
     return download_json(ADOBE_APPLICATION_JSON_URL, headers)
 
 
-def write_driver_xml(pkgJson: dict, pkgDir: str) -> None:
+def xml_langs_list(langRoot, langList):
+    for lg in langList:
+        if isinstance(lg, dict):
+            lg = lg["locale"]
+
+        for key, val in dict({"Language": ""}).items():
+            child = ET.Element(key)
+            child.set("locale", lg)
+            langRoot.append(child)
+
+
+def write_driver_xml(pkgJson: dict, pkgDir: str, reqLang: list[str]) -> None:
     """Generate Diver.xml and save to product dir"""
     driverInfo = ET.Element("DriverInfo")
     productInfo = ET.SubElement(driverInfo, "ProductInfo")
@@ -1025,11 +1052,10 @@ def write_driver_xml(pkgJson: dict, pkgDir: str) -> None:
 
     availLoc = pkgJson["SupportedLanguages"]["Language"]
     if availLoc[0]["locale"] != "mul":
-        for lg in availLoc:
-            for key, val in dict({"Language": ""}).items():
-                child = ET.Element(key)
-                child.set("locale", lg["locale"])
-                langRoot.append(child)
+        xml_langs_list(langRoot, availLoc)
+
+    elif reqLang[0] != "mul":
+        xml_langs_list(langRoot, reqLang)
 
     # suppress error on dep package download
     if "MinimumSupportedClientVersion" in pkgJson and "HDBuilderVersion" in pkgJson:
@@ -1082,7 +1108,7 @@ def product_download(prodInfo: list, allProducts: dict, reqLang: list) -> None:
         print(f"\nDownloading packages for {appName}, version-{version}")
 
         print("\nCreating Driver.xml file...")
-        write_driver_xml(appJsonData, cfg['productDir'])
+        write_driver_xml(appJsonData, cfg['productDir'], reqLang)
 
     print("\nCreating Application.json file...")
     create_json(os.path.join(pkgDir, "Application.json"), appJsonData)
