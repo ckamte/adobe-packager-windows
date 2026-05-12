@@ -1050,12 +1050,13 @@ def write_driver_xml(pkgJson: dict, pkgDir: str, reqLang: list[str]) -> None:
 
     langRoot = ET.SubElement(productInfo, "SupportedLanguages")
 
+    # for mul only apps (AME, etc)
     availLoc = pkgJson["SupportedLanguages"]["Language"]
-    if availLoc[0]["locale"] != "mul":
-        xml_langs_list(langRoot, availLoc)
-
-    elif reqLang[0] != "mul":
+    if reqLang[0] not in ["mul", "all"]:
         xml_langs_list(langRoot, reqLang)
+
+    elif availLoc[0]["locale"] != "mul":
+        xml_langs_list(langRoot, availLoc)
 
     # suppress error on dep package download
     if "MinimumSupportedClientVersion" in pkgJson and "HDBuilderVersion" in pkgJson:
