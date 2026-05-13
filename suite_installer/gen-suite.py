@@ -52,7 +52,7 @@ def add_product(elem):
         if Path(file).is_file() == False:
             continue
         
-        with open(file, "r") as f:
+        with open(file, "r", encoding='utf-8') as f:
             data = json.load(f)
             if data.get("AddRemoveInfo") and data.get("IsSTI") is False:
                 sapCode = data.get("SAPCode")
@@ -93,7 +93,7 @@ def add_product(elem):
                     for d in depList:
                         esdDir = f"{prodsDir}/{d.get("SAPCode")}"
                         depJson = os.path.join(Path(esdDir), "Application.json")
-                        with open(depJson, "r") as f:
+                        with open(depJson, "r", encoding='utf-8') as f:
                             depData = json.load(f)
                             size = calc_sizes(depData)
                             dPkg = ET.SubElement(deps, "Dependency")
