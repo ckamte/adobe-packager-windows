@@ -135,7 +135,7 @@ def accc_download():
     buildVer = str(v[3])
 
     platform = args.platform or "win64"
-    fileName = f"ACCCx{"_".join(v)}.zip"
+    fileName = f"ACCCx{'_'.join(v)}.zip"
     url = ACC_URL.format(
         mainVer=mainVer, buildVer=buildVer, platform=platform, fileName=fileName
     )
